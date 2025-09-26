@@ -266,6 +266,7 @@ function advanceFlow() {
 
   setText("#fpCorrect", String(State.fpCorrectCount));
   setText("#fpToRetry", String(State.fpToRetryCount));
+  if (State.fpToRetryCount === 0) { return nextTopic(); }
   show("#fpSummary");
   const onKey = (e)=>{ if (e.key === "Enter") { cleanup(); startMasteryLoop(); } };
   const cleanup = ()=>document.removeEventListener("keydown", onKey);
@@ -407,4 +408,6 @@ window.addEventListener("load", async () => {
   try { await loadCSV(); } catch (e) { console.error(e); toast("CSV failed to load. Ensure items.csv is in the same folder."); }
   initLanding();
   show("#landing");
+  const s = document.getElementById("student");
+  if (s) s.focus();
 });
