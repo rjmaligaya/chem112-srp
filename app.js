@@ -1,39 +1,18 @@
-/* 
-  CHEM112 SRP — Clean Web Experiment (DOM-based, PsychoJS-free scaffold)
-  ---------------------------------------------------------
-  Notes:
-  - This is a clean, framework-free JS implementation that mirrors the PsychoJS flow you described:
-      * week/topic gating
-      * randomized first pass
-      * mastery loop (until 1 correct) for Organic & Units
-      * special mastery (until 4 total correct per item) for Inorganic in Week 12
-      * single POST at the very end (no time gating)
-  - It loads a single CSV (items.csv) with columns: id,topic,image,answers
-  - Multiple acceptable answers are delimited with "||"
-  - Answers are normalized (case/space, basic chemistry units variants)
-  - Results are stored locally during the session and POSTed once to /api/ingest
-  - UI is mobile-first and minimal; no fullscreen
-  - You can style with CSS as desired
-
-  If you prefer a PsychoJS-specific Builder export, this file's logic can be
-  adapted to run inside Builder's routines (mapping presentItem(), handleResponse(), etc.).
-*/
+/* Updated app.js with UX tweaks and CSV-ready logging */
 
 const CONFIG = {
   CSV_URL: "items.csv",
   FEEDBACK_MS: 4000,
-  POST_URL: "/api/ingest",     // Worker endpoint; update if you deploy at another path
+  POST_URL: "/api/ingest",
   MAX_ANSWER_LEN: 120,
   UNIT_MAPS: [
-    // Unit normalizations (first-year friendly)
     { re: /\bm\/s\b/g, to: "m s^-1" },
     { re: /\bg\/ml\b/gi, to: "g mL^-1" },
     { re: /\buL\b/g, to: "μL" },
     { re: /\bumol\b/g, to: "μmol" },
-    { re: /\bmol\/L\b/gi, to: "M" }, // common equivalence
+    { re: /\bmol\/L\b/gi, to: "M" },
     { re: /\bdeg\b/gi, to: "°" },
   ],
-  // Week -> list of topics to run sequentially
   WEEK_TOPICS: {
     6: ["organic", "units"],
     7: ["units"],
@@ -47,15 +26,13 @@ const CONFIG = {
     units: "Units / Dimensional Analysis",
     inorganic: "Inorganic Nomenclature"
   },
-  // For mastery criteria by topic (default 1; inorganic in week 12 -> 4)
   MASTERY_REQUIRED: {
     organic: 1,
     units: 1,
-    inorganic: 1 // will be overridden to 4 if week === 12
+    inorganic: 1
   },
 };
 
-// --- Utilities ---
 function nfkc(s) { return s.normalize("NFKC"); }
 function collapseSpaces(s) { return s.replace(/\s+/g, " ").trim(); }
 function normalizeCommonUnits(s) {
@@ -69,7 +46,6 @@ function normalizeAnswer(s) {
   out = nfkc(out);
   out = collapseSpaces(out);
   out = normalizeCommonUnits(out);
-  // Common organic nomenclature cleanups
   out = out.replace(/\btrans\b/g, "trans")
            .replace(/\bcis\b/g, "cis")
            .replace(/\b\(e\)\b/g, "(e)")
@@ -88,98 +64,42 @@ function shuffle(arr) {
   }
   return a;
 }
-function uuidv4() {
-  // Simple UUID generator for client side (used only for local session tracking)
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0, v = c === "x" ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
 function nowISO() { return new Date().toISOString(); }
 
-// --- Simple CSV parser (no external deps) ---
-function parseCSV(text) {
-  // Basic CSV parser that handles quoted fields with commas
-  const rows = [];
-  let row = [], field = "", inQuotes = false;
-  for (let i=0; i<text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i+1] === '"') { field += '"'; i++; } // escaped quote
-        else { inQuotes = false; }
-      } else { field += c; }
-    } else {
-      if (c === '"') inQuotes = true;
-      else if (c === ",") { row.push(field); field = ""; }
-      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
-      else if (c === "\r") { /* skip CR */ }
-      else { field += c; }
-    }
-  }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
-  if (!rows.length) return [];
-  const header = rows[0];
-  return rows.slice(1).filter(r => r.length && r.some(x => x !== "")).map(r => {
-    const obj = {};
-    header.forEach((h, idx) => obj[h.trim()] = (r[idx] ?? ""));
-    return obj;
-  });
-}
-
-// --- Global state ---
 const State = {
-  step: "landing",           // landing -> topicIntro -> trial -> feedback -> summary or nextTopic
-  csvItems: [],              // all items from CSV
-  itemsByTopic: {},          // topic -> items[]
+  csvItems: [],
+  itemsByTopic: {},
   week: null,
-  topicsQueue: [],           // topics to run in order for the chosen week
+  topicsQueue: [],
   currentTopic: null,
-  masteryGoal: 1,            // per-topic (4 for inorganic in week 12)
+  masteryGoal: 1,
   studentNumber: "",
-  sessionId: uuidv4(),
   startTime: null,
   device: { w: window.innerWidth, h: window.innerHeight, ua: navigator.userAgent },
-  visibilityBlurs: 0,
 
-  // Trial bookkeeping
-  firstPass: [],             // shuffled
+  firstPass: [],
   fpIndex: 0,
-  masteryPool: [],           // items needing further correct attempts
+  masteryPool: [],
   masteryIndex: 0,
-  // For inorganic week 12: we track per-item correct count goal of 4
-  correctCounts: new Map(),  // id -> count of correct attempts
-
-  // Results to POST
+  correctCounts: new Map(),
   trials: [],
+  trialIndex: 0,
+
+  fpCorrectCount: 0,
+  fpToRetryCount: 0,
 };
 
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) State.visibilityBlurs += 1;
-});
-
-// --- UI helpers ---
 function $(sel) { return document.querySelector(sel); }
 function show(id) { document.querySelectorAll(".view").forEach(n => n.classList.add("hidden")); $(id).classList.remove("hidden"); }
 function setText(sel, txt) { const n = $(sel); if (n) n.textContent = txt; }
 function setImage(sel, src) { const n = $(sel); if (n) n.src = src; }
+function toast(msg) { const n = $("#toast"); n.textContent = msg; n.classList.remove("hidden"); setTimeout(()=>n.classList.add("hidden"),2000); }
 
-function toast(msg) {
-  const n = $("#toast");
-  n.textContent = msg;
-  n.classList.remove("hidden");
-  setTimeout(() => n.classList.add("hidden"), 2000);
-}
-
-// --- Data loading ---
 async function loadCSV() {
   const res = await fetch(CONFIG.CSV_URL, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load items.csv");
-  const text = await res.text();
-  const rows = parseCSV(text);
-  rows.forEach(r => {
-    r.acceptable = toAcceptableSet(r.answers);
-  });
+  const rows = parseCSV(await res.text());
+  rows.forEach(r => r.acceptable = toAcceptableSet(r.answers));
   State.csvItems = rows;
   State.itemsByTopic = {
     organic: rows.filter(r => String(r.topic).toLowerCase() === "organic"),
@@ -188,67 +108,68 @@ async function loadCSV() {
   };
 }
 
-// --- Landing flow ---
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i=0;i<text.length;i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') { if (text[i+1] === '"') { field+='"'; i++; } else { inQuotes = false; } }
+      else { field += c; }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+      else if (c === "\r") {}
+      else { field += c; }
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const header = rows[0];
+  return rows.slice(1).filter(r => r.length && r.some(x=>x!=="")).map(r => {
+    const o = {}; header.forEach((h,i)=>o[h.trim()] = (r[i] ?? "")); return o;
+  });
+}
+
 function initLanding() {
-  // Parse URL query for deep links
-  const q = new URLSearchParams(location.search);
-  const weekQ = q.get("week");
-  if (weekQ) $("#week").value = weekQ;
-  const topicQ = q.get("topic");
-  if (topicQ) $("#topic").value = topicQ;
-
-  $("#week").addEventListener("change", () => {
-    const w = Number($("#week").value);
-    populateTopicsForWeek(w);
-  });
-  populateTopicsForWeek(Number($("#week").value || 6));
-
   $("#startBtn").addEventListener("click", startSession);
-}
-
-function populateTopicsForWeek(w) {
-  const topics = CONFIG.WEEK_TOPICS[w] || [];
-  const sel = $("#topic");
-  sel.innerHTML = "";
-  topics.forEach(t => {
-    const opt = document.createElement("option");
-    opt.value = t;
-    opt.textContent = CONFIG.TOPIC_LABELS[t] || t;
-    sel.appendChild(opt);
+  document.addEventListener("keydown", (e)=>{
+    if (["INPUT","SELECT","TEXTAREA"].includes(document.activeElement?.tagName)) {
+      if (e.key === "Enter" && $("#landing") && !$("#landing").classList.contains("hidden")) {
+        startSession();
+      }
+    }
   });
 }
 
-// --- Session start ---
 function startSession() {
   const student = $("#student").value.trim();
   const week = Number($("#week").value);
-  if (!/^[0-9]{8}$/.test(student)) {
-    toast("Enter an 8-digit student number.");
-    return;
-  }
-  if (!CONFIG.WEEK_TOPICS[week]?.length) {
-    toast("Select a valid week.");
-    return;
-  }
+  if (!/^[0-9]{8}$/.test(student)) { toast("Enter an 8-digit student number."); return; }
+  if (!CONFIG.WEEK_TOPICS[week]?.length) { toast("Select a valid week."); return; }
   State.studentNumber = student;
   State.week = week;
-  State.topicsQueue = CONFIG.WEEK_TOPICS[week].slice(); // copy
+  State.topicsQueue = CONFIG.WEEK_TOPICS[week].slice();
   State.startTime = nowISO();
   State.trials = [];
-  State.visibilityBlurs = 0;
-  nextTopic();
+  State.trialIndex = 0;
+  showWeekIntro();
+}
+
+function showWeekIntro() {
+  show("#weekIntro");
+  const onKey = (e)=>{ if (e.key === "Enter") { cleanup(); nextTopic(); } };
+  const cleanup = ()=>document.removeEventListener("keydown", onKey);
+  document.addEventListener("keydown", onKey);
+  $("#beginWeekBtn").onclick = ()=>{ cleanup(); nextTopic(); };
 }
 
 function nextTopic() {
-  if (!State.topicsQueue.length) {
-    return showSummary();
-  }
+  if (!State.topicsQueue.length) { return showSummary(); }
   State.currentTopic = State.topicsQueue.shift();
-  // Mastery goal: default or special rule
   State.masteryGoal = CONFIG.MASTERY_REQUIRED[State.currentTopic] || 1;
-  if (State.currentTopic === "inorganic" && State.week === 12) {
-    State.masteryGoal = 4; // special spaced-like massed goal
-  }
+  if (State.currentTopic === "inorganic" && State.week === 12) State.masteryGoal = 4;
   showTopicIntro();
 }
 
@@ -258,25 +179,22 @@ function showTopicIntro() {
     ? "You will practice Inorganic Nomenclature. Each item must be answered correctly four times in total to achieve mastery."
     : "You will practice this topic until you master all items at least once.");
   show("#topicIntro");
-  $("#beginTopicBtn").onclick = () => prepareTrialsForTopic(State.currentTopic);
+  const onKey = (e)=>{ if (e.key === "Enter") { cleanup(); prepareTrialsForTopic(State.currentTopic); } };
+  const cleanup = ()=>document.removeEventListener("keydown", onKey);
+  document.addEventListener("keydown", onKey);
+  $("#beginTopicBtn").onclick = ()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); };
 }
 
-// --- Build first pass and mastery pools ---
 function prepareTrialsForTopic(topic) {
   const items = State.itemsByTopic[topic] || [];
-  if (!items.length) {
-    toast("No items found for topic.");
-    return nextTopic();
-  }
-  // initialize correctCounts if 4-correct mode
-  if (State.masteryGoal > 1) {
-    State.correctCounts.clear();
-    items.forEach(it => State.correctCounts.set(it.id, 0));
-  }
+  if (!items.length) { toast("No items found for topic."); return nextTopic(); }
+  if (State.masteryGoal > 1) { State.correctCounts.clear(); items.forEach(it => State.correctCounts.set(it.id, 0)); }
 
   State.firstPass = shuffle(items);
   State.fpIndex = 0;
-  State.masteryPool = []; // items that still need mastery (goal dependent)
+  State.masteryPool = [];
+  State.fpCorrectCount = 0;
+  State.fpToRetryCount = 0;
   presentItem(State.firstPass[State.fpIndex], "first_pass");
 }
 
@@ -287,13 +205,19 @@ function presentItem(item, phase) {
   show("#trial");
   const t0 = performance.now();
 
-  $("#submitBtn").onclick = () => {
+  const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
+  document.addEventListener("keydown", onKey);
+  $("#submitBtn").onclick = submit;
+
+  function submit() {
+    document.removeEventListener("keydown", onKey);
     const raw = $("#answer").value;
     const norm = normalizeAnswer(raw).slice(0, CONFIG.MAX_ANSWER_LEN);
     const ok = item.acceptable.has(norm);
     const rt = Math.max(0, Math.round(performance.now() - t0));
-    // record trial
-    const rec = {
+
+    State.trials.push({
+      trial_index: ++State.trialIndex,
       id: item.id,
       topic: State.currentTopic,
       week: State.week,
@@ -303,51 +227,54 @@ function presentItem(item, phase) {
       answer_norm: norm,
       correct: !!ok,
       ts: nowISO(),
-    };
-    State.trials.push(rec);
+    });
 
-    if (ok) {
-      // For 4-correct goal: increment count; if not yet mastered, keep in pool
-      if (State.masteryGoal > 1) {
-        const cur = State.correctCounts.get(item.id) ?? 0;
-        State.correctCounts.set(item.id, cur + 1);
-      }
-      showFeedback("Correct!", null);
-    } else {
-      const canonical = [...item.acceptable][0] || "(no key)";
-      showFeedback("Incorrect.", canonical);
-      // For first pass, we add to mastery; for mastery loop, we keep it there
-      if (!inMasteryPool(item)) State.masteryPool.push(item);
+    if (phase === "first_pass") {
+      if (ok) State.fpCorrectCount++;
+      else State.fpToRetryCount++;
     }
-  };
+
+    if (ok && State.masteryGoal > 1) {
+      const cur = State.correctCounts.get(item.id) ?? 0;
+      State.correctCounts.set(item.id, cur + 1);
+    }
+
+    const canonical = [...item.acceptable][0] || "(no key)";
+    showFeedback(ok ? "Correct!" : "Incorrect.", `The correct answer is: ${canonical}`);
+  }
 }
 
-function inMasteryPool(item) {
-  return State.masteryPool.some(it => it.id === item.id);
-}
-
-function showFeedback(msg, canonical) {
+function showFeedback(msg, canonicalLine) {
   setText("#fbText", msg);
-  setText("#fbCanonical", canonical ? `Correct answer: ${canonical}` : "");
+  setText("#fbCanonical", canonicalLine || "");
   show("#feedback");
   setTimeout(() => advanceFlow(), CONFIG.FEEDBACK_MS);
 }
 
 function advanceFlow() {
-  // If we are still in first pass
   if (State.fpIndex < State.firstPass.length - 1) {
     State.fpIndex++;
     return presentItem(State.firstPass[State.fpIndex], "first_pass");
   }
-  // First pass finished → setup mastery criteria
-  // For standard mastery (goal 1): pool already contains only misses.
-  // For goal 4: pool initially includes all items with count < 4 after first pass.
   if (State.masteryGoal > 1) {
     State.masteryPool = State.firstPass.filter(it => (State.correctCounts.get(it.id) || 0) < State.masteryGoal);
   }
-  // If nothing to master, move to next topic
+  if (State.masteryGoal === 1) {
+    const missedIds = new Set(State.trials.filter(t => t.phase === "first_pass" && !t.correct && t.topic === State.currentTopic).map(t => t.id));
+    State.masteryPool = State.firstPass.filter(it => missedIds.has(it.id));
+  }
+
+  setText("#fpCorrect", String(State.fpCorrectCount));
+  setText("#fpToRetry", String(State.fpToRetryCount));
+  show("#fpSummary");
+  const onKey = (e)=>{ if (e.key === "Enter") { cleanup(); startMasteryLoop(); } };
+  const cleanup = ()=>document.removeEventListener("keydown", onKey);
+  document.addEventListener("keydown", onKey);
+  $("#beginMasteryBtn").onclick = ()=>{ cleanup(); startMasteryLoop(); };
+}
+
+function startMasteryLoop() {
   if (!State.masteryPool.length) return nextTopic();
-  // Otherwise, start mastery loop
   State.masteryPool = shuffle(State.masteryPool);
   State.masteryIndex = 0;
   presentMastery(State.masteryPool[State.masteryIndex]);
@@ -360,12 +287,19 @@ function presentMastery(item) {
   show("#trial");
   const t0 = performance.now();
 
-  $("#submitBtn").onclick = () => {
+  const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
+  document.addEventListener("keydown", onKey);
+  $("#submitBtn").onclick = submit;
+
+  function submit() {
+    document.removeEventListener("keydown", onKey);
     const raw = $("#answer").value;
     const norm = normalizeAnswer(raw).slice(0, CONFIG.MAX_ANSWER_LEN);
     const ok = item.acceptable.has(norm);
     const rt = Math.max(0, Math.round(performance.now() - t0));
-    const rec = {
+
+    State.trials.push({
+      trial_index: ++State.trialIndex,
       id: item.id,
       topic: State.currentTopic,
       week: State.week,
@@ -375,8 +309,7 @@ function presentMastery(item) {
       answer_norm: norm,
       correct: !!ok,
       ts: nowISO(),
-    };
-    State.trials.push(rec);
+    });
 
     if (ok) {
       if (State.masteryGoal > 1) {
@@ -384,31 +317,19 @@ function presentMastery(item) {
         const next = cur + 1;
         State.correctCounts.set(item.id, next);
         if (next >= State.masteryGoal) {
-          // remove from pool
           State.masteryPool = State.masteryPool.filter(it => it.id !== item.id);
         }
       } else {
-        // goal 1: remove item from pool
         State.masteryPool = State.masteryPool.filter(it => it.id !== item.id);
       }
-      showFeedback("Correct!", null);
-    } else {
-      const canonical = [...item.acceptable][0] || "(no key)";
-      showFeedback("Incorrect.", canonical);
-      // keep item in pool
     }
-  };
-}
-
-function advanceFlowFromMastery() {
-  // Not used; we use showFeedback → advanceFlowMastery for clarity
-}
-
-function advanceFlowMastery() {
-  if (!State.masteryPool.length) {
-    return nextTopic();
+    const canonical = [...item.acceptable][0] || "(no key)";
+    showFeedback(ok ? "Correct!" : "Incorrect.", `The correct answer is: ${canonical}`);
   }
-  // Move to next item; reshuffle if we hit the end
+}
+
+function advanceAfterMasteryFeedback() {
+  if (!State.masteryPool.length) return nextTopic();
   State.masteryIndex++;
   if (State.masteryIndex >= State.masteryPool.length) {
     State.masteryPool = shuffle(State.masteryPool);
@@ -417,36 +338,39 @@ function advanceFlowMastery() {
   presentMastery(State.masteryPool[State.masteryIndex]);
 }
 
-// Override feedback transition when in mastery vs first pass
-function advanceFlow() {
-  if (State.fpIndex < State.firstPass.length - 1) {
-    State.fpIndex++;
-    return presentItem(State.firstPass[State.fpIndex], "first_pass");
-  }
-  // First pass done: ensure mastery pool prepared
-  if (State.masteryGoal > 1 && State.trials.some(t => t.phase === "first_pass")) {
-    State.masteryPool = State.firstPass.filter(it => (State.correctCounts.get(it.id) || 0) < State.masteryGoal);
-  }
-  if (!State.masteryPool.length) return nextTopic();
-  // continue mastery
-  if (State.masteryIndex == null) State.masteryIndex = 0;
-  return advanceFlowMastery();
-}
+const _origShowFeedback = showFeedback;
+showFeedback = function(msg, canonicalLine) {
+  setText("#fbText", msg);
+  setText("#fbCanonical", canonicalLine || "");
+  show("#feedback");
+  setTimeout(() => {
+    const last = State.trials[State.trials.length-1];
+    if (last && last.phase === "mastery") return advanceAfterMasteryFeedback();
+    return advanceFlow();
+  }, CONFIG.FEEDBACK_MS);
+};
 
-// --- Summary & POST ---
 function showSummary() {
-  // Simple stats
   const total = State.trials.length;
   const correct = State.trials.filter(t => t.correct).length;
   setText("#sumTotal", String(total));
   setText("#sumCorrect", String(correct));
-  setText("#sumBlurs", String(State.visibilityBlurs));
   show("#summary");
 
-  $("#submitResultsBtn").onclick = submitResults;
+  const btn = $("#submitResultsBtn");
+  btn.disabled = false;
+  btn.textContent = "Submit Results";
+  $("#uploadStatus").textContent = "";
+  btn.onclick = submitResultsOnce;
 }
 
-async function submitResults() {
+let submittedOk = false;
+async function submitResultsOnce() {
+  if (submittedOk) return;
+  const btn = $("#submitResultsBtn");
+  btn.disabled = true;
+  btn.textContent = "Submitting…";
+
   const payload = {
     student_number: State.studentNumber,
     week: State.week,
@@ -454,7 +378,6 @@ async function submitResults() {
     started_at: State.startTime,
     completed_at: nowISO(),
     device: State.device,
-    visibility_blurs: State.visibilityBlurs,
     trials: State.trials,
   };
 
@@ -463,28 +386,25 @@ async function submitResults() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      credentials: "include",
       cache: "no-store"
     });
     if (!res.ok) {
       const txt = await res.text();
       throw new Error("Upload failed: " + res.status + " " + txt);
     }
-    setText("#uploadStatus", "Results uploaded successfully.");
+    submittedOk = true;
+    $("#uploadStatus").textContent = "Results uploaded successfully.";
+    setTimeout(()=>show("#thankyou"), 600);
   } catch (err) {
     console.error(err);
-    setText("#uploadStatus", "Upload failed. You can retry by clicking the button again.");
+    $("#uploadStatus").textContent = "Upload failed. Please click Submit Results again to retry.";
+    btn.disabled = false;
+    btn.textContent = "Submit Results";
   }
 }
 
-// --- Boot ---
 window.addEventListener("load", async () => {
+  try { await loadCSV(); } catch (e) { console.error(e); toast("CSV failed to load. Ensure items.csv is in the same folder."); }
   initLanding();
-  try {
-    await loadCSV();
-  } catch (e) {
-    console.error(e);
-    toast("CSV failed to load. Ensure items.csv is in the same folder.");
-  }
   show("#landing");
 });
