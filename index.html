@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CHEM112 SRP Study</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; background:#0b0d10; color:#eef2f8; }
+    .container { max-width: 820px; margin: 0 auto; padding: 16px; }
+    h1,h2 { margin: 0.4em 0; }
+    label { display:block; margin:12px 0 6px; font-size: 0.95rem; color: #b9c4d0;}
+    input, select, button, textarea {
+      width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #2a2f36;
+      background: #12161c; color:#eef2f8; box-sizing: border-box; font-size: 1rem;
+    }
+    button { cursor: pointer; border: 1px solid #3a80ff; }
+    button:hover { background:#0d285c; }
+    .view.hidden { display:none; }
+    .card { background:#0f1318; border: 1px solid #1e2630; border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+    .imgwrap { display:flex; align-items:center; justify-content:center; background:#0a0e12; border:1px solid #1b222b; border-radius:16px; height: 320px; overflow:hidden; }
+    img.q { max-width:100%; max-height:100%; }
+    .row { display:flex; gap:12px; }
+    .row > * { flex:1; }
+    .muted { color:#9cabba; font-size: 0.9rem; }
+    #toast { position: fixed; bottom: 18px; left: 0; right: 0; margin: 0 auto; max-width: 600px; background:#1b2430; border:1px solid #2b3645; padding:12px 16px; border-radius:12px; text-align:center; }
+    #toast.hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Spaced Retrieval Practice</h1>
+    <p class="muted">Answer questions for your current week. You’ll get feedback after each response and loop missed items until mastery.</p>
+
+    <div id="landing" class="view card hidden">
+      <h2>Start</h2>
+      <label>Student Number (8 digits)</label>
+      <input id="student" inputmode="numeric" maxlength="8" placeholder="########">
+
+      <div class="row">
+        <div>
+          <label>Week</label>
+          <select id="week">
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="12">Week 12</option>
+          </select>
+        </div>
+        <div>
+          <label>Topic (auto-selected for week)</label>
+          <select id="topic" disabled></select>
+        </div>
+      </div>
+
+      <button id="startBtn" style="margin-top:12px">Begin</button>
+    </div>
+
+    <div id="topicIntro" class="view card hidden">
+      <h2 id="topicTitle"></h2>
+      <p id="topicDesc" class="muted"></p>
+      <button id="beginTopicBtn">Start Topic</button>
+    </div>
+
+    <div id="trial" class="view card hidden">
+      <div class="imgwrap"><img id="qImage" class="q" alt="Question image"></div>
+      <label style="margin-top:12px;">Your answer</label>
+      <input id="answer" placeholder="Type your answer">
+      <button id="submitBtn" style="margin-top:12px">Submit</button>
+    </div>
+
+    <div id="feedback" class="view card hidden">
+      <h2 id="fbText"></h2>
+      <p class="muted" id="fbCanonical"></p>
+      <p class="muted">Continuing automatically…</p>
+    </div>
+
+    <div id="summary" class="view card hidden">
+      <h2>Session complete</h2>
+      <p>Total attempts: <b id="sumTotal">0</b></p>
+      <p>Correct attempts: <b id="sumCorrect">0</b></p>
+      <p>Times switched away from this tab: <b id="sumBlurs">0</b></p>
+      <button id="submitResultsBtn">Submit Results</button>
+      <p id="uploadStatus" class="muted" style="margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
