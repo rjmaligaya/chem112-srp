@@ -29,13 +29,13 @@
 <body>
   <div class="container">
     <h1>Spaced Retrieval Practice</h1>
-    <p class="muted">Answer questions for your current week. You’ll get feedback after each response and loop missed items until mastery.</p>
+    <p class="muted">Answer questions for your current week. You’ll get feedback after each response and re-attempt any missed items until mastery.</p>
 
+    <!-- Start -->
     <div id="landing" class="view card hidden">
       <h2>Start</h2>
       <label>Student Number (8 digits)</label>
       <input id="student" inputmode="numeric" maxlength="8" placeholder="########">
-
       <div class="row">
         <div>
           <label>Week</label>
@@ -48,41 +48,70 @@
             <option value="12">Week 12</option>
           </select>
         </div>
-        <div>
-          <label>Topic (auto-selected for week)</label>
-          <select id="topic" disabled></select>
-        </div>
       </div>
-
       <button id="startBtn" style="margin-top:12px">Begin</button>
+      <p class="muted" style="margin-top:8px;">Tip: press <b>Enter</b> to start.</p>
     </div>
 
+    <!-- Week Intro -->
+    <div id="weekIntro" class="view card hidden">
+      <h2>Welcome to the CHEM112 SRP Study</h2>
+      <p class="muted" id="weekIntroText">
+        You will be shown a series of questions that review your first few weeks of classes.
+        Type your answer and press <b>Enter</b> or click <b>Submit</b>.
+        If you answer incorrectly, the correct answer will be shown for a short time.
+        After your initial go, you will re-attempt any missed questions until you have mastered the topic.
+      </p>
+      <button id="beginWeekBtn">Continue</button>
+      <p class="muted" style="margin-top:8px;">Press <b>Enter</b> to continue.</p>
+    </div>
+
+    <!-- Topic Intro -->
     <div id="topicIntro" class="view card hidden">
       <h2 id="topicTitle"></h2>
       <p id="topicDesc" class="muted"></p>
       <button id="beginTopicBtn">Start Topic</button>
+      <p class="muted" style="margin-top:8px;">Press <b>Enter</b> to start this topic.</p>
     </div>
 
+    <!-- Trial -->
     <div id="trial" class="view card hidden">
       <div class="imgwrap"><img id="qImage" class="q" alt="Question image"></div>
       <label style="margin-top:12px;">Your answer</label>
       <input id="answer" placeholder="Type your answer">
       <button id="submitBtn" style="margin-top:12px">Submit</button>
+      <p class="muted" style="margin-top:8px;">Press <b>Enter</b> to submit.</p>
     </div>
 
+    <!-- Feedback -->
     <div id="feedback" class="view card hidden">
       <h2 id="fbText"></h2>
       <p class="muted" id="fbCanonical"></p>
       <p class="muted">Continuing automatically…</p>
     </div>
 
+    <!-- First-pass summary (per topic) -->
+    <div id="fpSummary" class="view card hidden">
+      <h2>First Attempt Summary</h2>
+      <p>Correct on first attempt: <b id="fpCorrect">0</b></p>
+      <p>To re-attempt: <b id="fpToRetry">0</b></p>
+      <button id="beginMasteryBtn">Begin Re-attempts</button>
+      <p class="muted" style="margin-top:8px;">Press <b>Enter</b> to continue.</p>
+    </div>
+
+    <!-- Session Summary -->
     <div id="summary" class="view card hidden">
       <h2>Session complete</h2>
       <p>Total attempts: <b id="sumTotal">0</b></p>
       <p>Correct attempts: <b id="sumCorrect">0</b></p>
-      <p>Times switched away from this tab: <b id="sumBlurs">0</b></p>
       <button id="submitResultsBtn">Submit Results</button>
       <p id="uploadStatus" class="muted" style="margin-top:8px;"></p>
+    </div>
+
+    <!-- Thank you -->
+    <div id="thankyou" class="view card hidden">
+      <h2>Thank you!</h2>
+      <p class="muted">Your results have been received.</p>
     </div>
   </div>
 
