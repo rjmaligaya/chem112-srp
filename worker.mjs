@@ -52,7 +52,7 @@ export default {
     }
 
     const csv = rows.join("\n");
-    const key = `${sn}_${week}_chem112srp.csv`; // requested naming
+    const key = `Week-${week}/Week_${week}_${sn}_chem112srp.csv`; // requested naming
 
     try {
       await env.RESULTS.put(key, csv, { httpMetadata: { contentType: "text/csv; charset=utf-8" } });
