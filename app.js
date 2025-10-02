@@ -288,14 +288,7 @@ function presentItem(item, phase) {
     fillPrompt.style.display="none";
     fillPrompt.textContent = "";
   }
-  const fillPrompt = document.getElementById("fillPrompt");
-  if (String(item.q_type).toLowerCase()==="fill" && item.unfilled) {
-    fillPrompt.style.display="block";
-    fillPrompt.textContent = item.unfilled; // e.g., "2-______pentane"
-  } else {
-    fillPrompt.style.display="none";
-    fillPrompt.textContent = "";
-  }
+
   $("#trialWarn").style.display="none";
   $("#inlineFeedback").style.display="none";
   $("#countdown").textContent="";
@@ -493,6 +486,8 @@ function presentMastery(item) {
   const submitBtn=$("#submitBtn");
   submitBtn.classList.remove("btn-ok","active","btn-bad");
   submitBtn.disabled=false;
+  submitBtn.textContent = "Submit";
+
 
   const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
   document.addEventListener("keydown", onKey);
