@@ -44,6 +44,13 @@
     .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0d1218}
     .btn-row{display:flex;gap:8px;flex-wrap:wrap}
     .predict button{flex:1;min-width:46px}
+  
+    /* Button bounce animation */
+    @keyframes btn-pop { 0%{transform:scale(1)} 40%{transform:scale(0.96)} 100%{transform:scale(1)} }
+    .pop { animation: btn-pop 180ms ease-out; }
+
+    /* Optional full-screen confetti canvas */
+    #confettiFull { position:fixed; inset:0; pointer-events:none; z-index:9999; }
   </style>
 </head>
 <body>
@@ -141,7 +148,7 @@
       <h2>Flashcards complete! 🎉</h2>
       <p class="muted">Thank you for your participation!</p>
       <div class="actions">
-        <button id="submitResultsBtn">Retry/Check Upload</button>
+        <button id="submitResultsBtn">Check/Retry Upload</button>
         <span id="uploadStatus" class="muted" style="margin-left:8px;"></span>
       </div>
     </div>

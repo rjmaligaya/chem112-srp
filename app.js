@@ -361,18 +361,18 @@ function presentItem(item, phase) {
 
     // Button visuals, sound, vibration
     if (ok){
-      submitBtn.textContent="Correct ✅";
+      submitBtn.textContent="Correct 🥳"; submitBtn.classList.add("pop");
       submitBtn.classList.add("btn-ok","active");
       try { $("#sndOk").play(); } catch{}
     } else {
-      submitBtn.textContent="Incorrect ❗";
+      submitBtn.textContent="Incorrect 😢"; submitBtn.classList.add("pop");
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
-      if (navigator.vibrate) navigator.vibrate([50,30,50]);
+      try { if (typeof navigator.vibrate==="function") navigator.vibrate([80,40,80]); } catch{}
     }
 
     // Confetti on correct
-    if (ok) confettiBurst();
+    if (ok) confettiFrom(submitBtn);
 
     // Countdown 3..1 then advance
     startCountdown(()=>{
@@ -393,7 +393,43 @@ function startCountdown(done){
   }, 1000);
 }
 
-function confettiBurst(){
+function confettiFrom(el){
+  try{
+    const rect = el.getBoundingClientRect();
+    let cvs = document.getElementById("confettiFull");
+    if (!cvs){
+      cvs = document.createElement("canvas");
+      cvs.id = "confettiFull";
+      document.body.appendChild(cvs);
+      const onresize = ()=>{ cvs.width = window.innerWidth; cvs.height = window.innerHeight; };
+      window.addEventListener("resize", onresize); onresize();
+    } else { cvs.width = window.innerWidth; cvs.height = window.innerHeight; }
+    const ctx = cvs.getContext("2d");
+    const originX = rect.left + rect.width/2;
+    const originY = rect.top + rect.height/2;
+    const pieces = Array.from({length:80}, ()=>({x:originX,y:originY,vx:(Math.random()-0.5)*6,vy:-Math.random()*5-2,gr:0.12,rx:Math.random()*6.28,vr:0.2+Math.random()*0.4,w:4+Math.random()*4,h:8+Math.random()*8}));
+    const colors = ["#11b66a","#3a80ff","#f2c94c","#eb5757","#bb6bd9"];
+    let frames=0;
+    function tick(){
+      frames++;
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      pieces.forEach(p=>{
+        p.vy += p.gr;
+        p.x += p.vx; p.y += p.vy; p.rx += p.vr;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rx);
+        ctx.fillStyle = colors[(Math.random()*colors.length)|0];
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      });
+      if (frames<75) requestAnimationFrame(tick); else ctx.clearRect(0,0,cvs.width,cvs.height);
+    }
+    tick();
+  }catch(e){}
+}
+function confettiBurst(){ // legacy fallback
+
   const cvs = $("#confetti");
   if (!cvs) return;
   const ctx = cvs.getContext("2d");
@@ -435,8 +471,8 @@ function advanceFlow() {
   }
 
   // Attempt 1 summary
-  setText("#attemptTitle", "Attempt 1 summary");
-  setText("#attemptStats", `total correct = ${State.fpCorrectCount}/${State.firstPass.length}`);
+  setText("#attemptTitle", "Attempt 1 Summary");
+  setText("#attemptStats", `Total Re-Attempts = ${State.masteryPool.length}`);
   const toRetry = State.masteryPool.length;
   if (toRetry===0){
     setText("#attemptNext", "All correct — great job!");
@@ -447,7 +483,7 @@ function advanceFlow() {
     $("#beginMasteryBtn").onclick=()=>{ cleanup(); nextTopic(); };
     return;
   } else {
-    setText("#attemptNext", `To re-attempt: ${toRetry}`);
+    setText("#attemptNext", `To Re-Attempt: ${toRetry}`);
   }
   show("#fpSummary");
   const onKey=(e)=>{ if (e.key==="Enter"){ cleanup(); startMasteryLoop(); } };
@@ -552,26 +588,35 @@ function presentMastery(item) {
     }
 
     if (ok){
-      submitBtn.textContent="Correct ✅";
+      submitBtn.textContent="Correct 🥳"; submitBtn.classList.add("pop");
       submitBtn.classList.add("btn-ok","active");
       try { $("#sndOk").play(); } catch{}
     } else {
-      submitBtn.textContent="Incorrect ❗";
+      submitBtn.textContent="Incorrect 😢"; submitBtn.classList.add("pop");
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
-      if (navigator.vibrate) navigator.vibrate([50,30,50]);
+      try { if (typeof navigator.vibrate==="function") navigator.vibrate([80,40,80]); } catch{}
     }
-    if (ok) confettiBurst();
+    if (ok) confettiFrom(submitBtn);
 
     startCountdown(()=> advanceAfterMasteryFeedback());
   }
 }
 
+
 function advanceAfterMasteryFeedback() {
-  // If pool empty → topic done or start another sweep
-  if (!State.masteryPool.length) {
-    // finished mastery → next topic
-    return nextTopic();
+  if (!State.masteryPool.length) { return nextTopic(); }
+
+  State.masteryIndex++;
+  if (State.masteryIndex >= State.masteryPool.length) {
+    if (State.masteryPool.length) {
+      State.attemptNumber++;
+      State.masteryPool = shuffle(State.masteryPool);
+      State.masteryIndex = 0;
+      return presentMastery(State.masteryPool[State.masteryIndex]);
+    } else {
+      return nextTopic();
+    }
   }
   // Continue current sweep
   State.masteryIndex++;
@@ -600,15 +645,57 @@ function advanceAfterMasteryFeedback() {
   presentMastery(State.masteryPool[State.masteryIndex]);
 }
 
+
 function showSummary() {
   show("#summary");
-  // Auto-upload once; button serves as retry/status
-  autoUploadOnce();
-  $("#submitResultsBtn").onclick = autoUploadOnce;
+  $("#uploadStatus").textContent = "Click 'Check/Retry Upload' to send your results.";
+  $("#submitResultsBtn").disabled = false;
+  $("#submitResultsBtn").onclick = autoUploadInteractive;
 }
 
 
 let uploadedOnce = false;
+
+async function autoUploadInteractive() {
+  const btn = $("#submitResultsBtn");
+  btn.disabled = true;
+  $("#uploadStatus").textContent = "Uploading…";
+
+  const payload = {
+    student_number: State.studentNumber,
+    week: State.week,
+    topics_run: CONFIG.WEEK_TOPICS[State.week] || [],
+    started_at: State.startTime,
+    completed_at: nowISO(),
+    device: State.device,
+    trials: State.trials,
+  };
+
+  let url = "/api/ingest";
+  if (location.hostname.endsWith(".pages.dev")) {
+    url = CONFIG.WORKER_FALLBACK_URL;
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      cache: "no-store"
+    });
+    const ok = res.ok;
+    const text = await res.text();
+    if (!ok) throw new Error(text || String(res.status));
+
+    $("#uploadStatus").textContent = "Upload recorded (or already exists).";
+    setTimeout(()=>show("#thankyou"), 700);
+  } catch (err) {
+    console.error(err);
+    $("#uploadStatus").textContent = "Upload failed. Click 'Check/Retry Upload' to try again.";
+    btn.disabled = false;
+  }
+}
+
 async function autoUploadOnce() {
   if (uploadedOnce) return;
   const btn = $("#submitResultsBtn");
