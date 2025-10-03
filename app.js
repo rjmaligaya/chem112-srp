@@ -95,6 +95,74 @@ const State = {
   metaEstimate: null,
 };
 
+// Detect mobile once and tag <html>
+const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
+if (isMobile) document.documentElement.classList.add("mobile");
+
+// Handle virtual keyboard: shrink image area when keyboard is open
+if (window.visualViewport) {
+  const vv = window.visualViewport;
+  const updateKB = () => {
+    const open = vv.height < window.innerHeight * 0.85;
+    document.documentElement.classList.toggle("kbd-open", open);
+    // Keep the focused input visible above the keyboard
+    const active = document.activeElement;
+    if (open && active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+      active.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  };
+  vv.addEventListener("resize", updateKB);
+  vv.addEventListener("scroll", updateKB);
+}
+
+// Topbar: Home + Instructions
+function attachTopbar() {
+  const bounceAnd = (el, fn) => { if (el) { rePop(el); setTimeout(fn, 400); } };
+  const home = document.getElementById("homeBtn");
+  const instr = document.getElementById("instrBtn");
+  const back = document.getElementById("backFromInstr");
+
+  if (home) home.onclick = () => bounceAnd(home, goHome);
+  if (instr) instr.onclick = () => bounceAnd(instr, showInstructions);
+  if (back)  back.onclick  = () => bounceAnd(back, () => {
+    // return to the Start screen (or change to previous view if you prefer)
+    show("#landing");
+  });
+}
+
+function goHome() {
+  // soft reset
+  State.week = null;
+  State.topicsQueue = [];
+  State.currentTopic = null;
+  State.masteryGoal = 1;
+  State.firstPass = [];
+  State.fpIndex = 0;
+  State.masteryPool = [];
+  State.masteryIndex = 0;
+  State.correctCounts.clear();
+  State.trials = [];
+  State.trialIndex = 0;
+  State.attemptNumber = 1;
+  State.metaEstimate = null;
+
+  // clear inputs
+  const s = document.getElementById("student");
+  const w = document.getElementById("week");
+  if (s) s.value = "";
+  if (w) w.value = "6";
+
+  show("#landing");
+}
+
+function showInstructions() {
+  // Ensure the iframe is pointed at your pdf (already is by default)
+  const f = document.getElementById("instrFrame");
+  if (f && !f.src) f.src = "instructions.pdf";
+  show("#instructions");
+}
+
+
 // DOM helpers
 function $(sel) { return document.querySelector(sel); }
 function show(sel) {
@@ -419,6 +487,9 @@ function presentItem(item, phase) {
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
       try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
+      // Add a shake animation on wrong answers
+      submitBtn.classList.add("shake");
+      submitBtn.addEventListener("animationend", () => submitBtn.classList.remove("shake"), { once:true });
     }
 
     // Confetti on correct
@@ -646,6 +717,9 @@ function presentMastery(item) {
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
       try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
+      // Add a shake animation on wrong answers
+      submitBtn.classList.add("shake");
+      submitBtn.addEventListener("animationend", () => submitBtn.classList.remove("shake"), { once:true });
     }
     if (ok) confettiFrom(submitBtn);
 
@@ -783,6 +857,7 @@ async function autoUploadOnce() {
 
 window.addEventListener("load", async () => {
   try { await loadCSV(); } catch (e) { console.error(e); toast("CSV failed to load. Ensure items.csv is in the same folder."); }
+  attachTopbar();
   initLanding();
   show("#landing");
 });
