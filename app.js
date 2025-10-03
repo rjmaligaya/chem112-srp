@@ -118,6 +118,32 @@ if (isMobile) {
 }
 
 
+// Turn off keyboard-driven layout changes
+const ENABLE_KB_ADJUST = false;
+
+// Keyboard-aware class (disabled unless toggle is true)
+if (ENABLE_KB_ADJUST) {
+  (function (){
+    let kbTimer = null;
+    const isTextField = el => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+    document.addEventListener("focusin", (e) => {
+      if (isMobile && isTextField(e.target)) {
+        clearTimeout(kbTimer);
+        kbTimer = setTimeout(() => document.documentElement.classList.add("kbd-open"), 100);
+      }
+    }, true);
+
+    document.addEventListener("focusout", (e) => {
+      if (isMobile && isTextField(e.target)) {
+        clearTimeout(kbTimer);
+        kbTimer = setTimeout(() => document.documentElement.classList.remove("kbd-open"), 150);
+      }
+    }, true);
+  })();
+}
+
+
 // Keyboard-aware class without fighting scrolling (works nicer on iOS/Android)
 (function (){
   let kbTimer = null;
