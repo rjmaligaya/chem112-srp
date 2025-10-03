@@ -184,11 +184,11 @@ function startSession() {
 }
 
 function showWeekIntro() {
-  // Build prediction prompt per current topic to be shown on topic intro instead; but the user wants it before each quiz.
-  // We'll collect prediction here per upcoming topic when we enter topicIntro; for now show a neutral screen.
   show("#weekIntro");
+
   // Build buttons 1..10
-  const wrap = $("#predictBtns"); wrap.innerHTML = "";
+  const wrap = $("#predictBtns"); 
+  wrap.innerHTML = "";
   for (let i=1;i<=10;i++){
     const b=document.createElement("button");
     b.textContent=String(i);
@@ -196,23 +196,42 @@ function showWeekIntro() {
       State.metaEstimate = i;
       $("#beginWeekBtn").disabled=false;
       $("#predictWarn").style.display="none";
-      [...wrap.children].forEach(ch=>{ ch.classList.remove("active"); ch.classList.remove("btn-ok"); ch.classList.remove("btn-bad"); });
-      b.classList.add("active"); b.classList.add("btn-ok");
+      [...wrap.children].forEach(ch=>{
+        ch.classList.remove("active","btn-ok","btn-bad");
+      });
+      b.classList.add("active","btn-ok");
     };
     wrap.appendChild(b);
   }
-  const onKey=(e)=>{
-  if (e.key==="Enter"){
+
+  const btn = $("#beginWeekBtn");
+
+  const proceed = () => {
     if (State.metaEstimate==null){
-      const w=$("#predictWarn"); w.textContent="Please select a number."; w.style.display="block";
-    } else {
-      const btn = $("#beginWeekBtn");
-      if (btn) rePop(btn);          // bounce Begin button
-      cleanup(); nextTopic();
+      const w=$("#predictWarn");
+      w.textContent="Please select a number.";
+      w.style.display="block";
+      return;
     }
-  }
-};
+    if (btn) rePop(btn);         // bounce the Begin button
+    cleanup();
+    nextTopic();
+  };
+
+  const onKey = (e) => {
+    if (e.key === "Enter") {
+      proceed();
+    }
+  };
+
+  const cleanup = () => {
+    document.removeEventListener("keydown", onKey);
+  };
+
+  document.addEventListener("keydown", onKey);
+  btn.onclick = proceed;
 }
+
 
 function nextTopic() {
   if (!State.topicsQueue.length) { return showSummary(); }
