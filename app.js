@@ -158,10 +158,12 @@ function initLanding() {
   $("#startBtn").addEventListener("click", startSession);
   // Enter to start anywhere on landing
   document.addEventListener("keydown", (e)=>{
-    if ($("#landing") && !$("#landing").classList.contains("hidden") && e.key === "Enter") {
-      startSession();
-    }
-  });
+  if ($("#landing") && !$("#landing").classList.contains("hidden") && e.key === "Enter") {
+    const start = $("#startBtn");
+    if (start) rePop(start);       // bounce the Start button visually
+    startSession();
+  }
+});
 }
 
 function startSession() {
@@ -200,17 +202,16 @@ function showWeekIntro() {
     wrap.appendChild(b);
   }
   const onKey=(e)=>{
-    if (e.key==="Enter"){
-      if (State.metaEstimate==null){ const w=$("#predictWarn"); w.textContent="Please select a number."; w.style.display="block"; }
-      else { cleanup(); nextTopic(); }
+  if (e.key==="Enter"){
+    if (State.metaEstimate==null){
+      const w=$("#predictWarn"); w.textContent="Please select a number."; w.style.display="block";
+    } else {
+      const btn = $("#beginWeekBtn");
+      if (btn) rePop(btn);          // bounce Begin button
+      cleanup(); nextTopic();
     }
-  };
-  const cleanup=()=>document.removeEventListener("keydown", onKey);
-  document.addEventListener("keydown", onKey);
-  $("#beginWeekBtn").onclick=()=>{
-    if (State.metaEstimate==null){ const w=$("#predictWarn"); w.textContent="Please select a number."; w.style.display="block"; return; }
-    cleanup(); nextTopic();
-  };
+  }
+};
 }
 
 function nextTopic() {
@@ -230,10 +231,10 @@ function showTopicIntro() {
 
   // Topic intro requires no extra action; enable Start once we enter
   const btn=$("#beginTopicBtn"); btn.disabled=false;
-  const onKey=(e)=>{ if (e.key==="Enter"){ cleanup(); prepareTrialsForTopic(State.currentTopic); } };
+  const onKey=(e)=>{ if (e.key==="Enter"){ rePop(btn); cleanup(); prepareTrialsForTopic(State.currentTopic); } };
   const cleanup=()=>document.removeEventListener("keydown", onKey);
   document.addEventListener("keydown", onKey);
-  btn.onclick=()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); };
+  btn.onclick=()=>{ /* global click will also bounce, this is extra-safe */ rePop(btn); cleanup(); prepareTrialsForTopic(State.currentTopic); };
 }
 
 function prepareTrialsForTopic(topic) {
@@ -278,6 +279,13 @@ function labelForType(q_type){
 function rePop(el){
   try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
 }
+
+// Global bounce for any button click (mouse/touch/spacebar-enter on focused button)
+document.addEventListener("click", (e) => {
+  const b = e.target && e.target.closest && e.target.closest("button");
+  if (b) rePop(b);
+});
+
 
 function presentItem(item, phase) {
   setImage("#qImage", item.image);
