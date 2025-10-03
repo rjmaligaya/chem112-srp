@@ -2,7 +2,7 @@
 
 const CONFIG = {
   CSV_URL: "items.csv",
-  FEEDBACK_MS: 3000, // 3 sec with visible countdown
+  FEEDBACK_MS: 5000, // 3 sec with visible countdown
   MAX_ANSWER_LEN: 120,
   UNIT_MAPS: [
     { re: /\bm\/s\b/g, to: "m s^-1" },
@@ -299,11 +299,17 @@ function presentItem(item, phase) {
   const submitBtn=$("#submitBtn");
   submitBtn.classList.remove("btn-ok","active","btn-bad");
   submitBtn.disabled=false;
+  submitBtn.textContent = "Submit";
 
   const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
   document.addEventListener("keydown", onKey);
   $("#submitBtn").onclick = submit;
 
+  function rePop(el){
+  try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
+}
+
+  
   function submit() {
     const raw = $("#answer").value;
     if (String(raw).trim()===""){
@@ -361,18 +367,19 @@ function presentItem(item, phase) {
 
     // Button visuals, sound, vibration
     if (ok){
-      submitBtn.textContent="Correct 🥳"; submitBtn.classList.add("pop");
+      submitBtn.textContent="Correct 🥳"; rePop(submitBtn);
       submitBtn.classList.add("btn-ok","active");
       try { $("#sndOk").play(); } catch{}
     } else {
-      submitBtn.textContent="Incorrect 😢"; submitBtn.classList.add("pop");
+      submitBtn.textContent="Incorrect 😢"; rePop(submitBtn);
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
-      try { if (typeof navigator.vibrate==="function") navigator.vibrate([80,40,80]); } catch{}
+      try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
     }
 
     // Confetti on correct
     if (ok) confettiFrom(submitBtn);
+    
 
     // Countdown 3..1 then advance
     startCountdown(()=>{
@@ -385,7 +392,7 @@ function presentItem(item, phase) {
 
 function startCountdown(done){
   const label=$("#countdown");
-  let t=3;
+  let t = Math.max(1, Math.round(CONFIG.FEEDBACK_MS/1000)); // now 5
   label.textContent = `Continuing in ${t}…`;
   const id=setInterval(()=>{
     t--; if (t<=0){ clearInterval(id); label.textContent=""; done(); }
@@ -407,7 +414,7 @@ function confettiFrom(el){
     const ctx = cvs.getContext("2d");
     const originX = rect.left + rect.width/2;
     const originY = rect.top + rect.height/2;
-    const pieces = Array.from({length:80}, ()=>({x:originX,y:originY,vx:(Math.random()-0.5)*6,vy:-Math.random()*5-2,gr:0.12,rx:Math.random()*6.28,vr:0.2+Math.random()*0.4,w:4+Math.random()*4,h:8+Math.random()*8}));
+    const pieces = Array.from({length:80}, ()=>({x:originX,y:originY,vx:(Math.random()-0.5)*3,vy:-Math.random()*3-1,gr:0.06,rx:Math.random()*6.28,vr:0.2+Math.random()*0.4,w:4+Math.random()*4,h:8+Math.random()*8}));
     const colors = ["#11b66a","#3a80ff","#f2c94c","#eb5757","#bb6bd9"];
     let frames=0;
     function tick(){
@@ -423,7 +430,7 @@ function confettiFrom(el){
         ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
         ctx.restore();
       });
-      if (frames<75) requestAnimationFrame(tick); else ctx.clearRect(0,0,cvs.width,cvs.height);
+      if (frames<120) requestAnimationFrame(tick); else ctx.clearRect(0,0,cvs.width,cvs.height);
     }
     tick();
   }catch(e){}
@@ -588,14 +595,14 @@ function presentMastery(item) {
     }
 
     if (ok){
-      submitBtn.textContent="Correct 🥳"; submitBtn.classList.add("pop");
+      submitBtn.textContent="Correct 🥳"; rePop(submitBtn);
       submitBtn.classList.add("btn-ok","active");
       try { $("#sndOk").play(); } catch{}
     } else {
-      submitBtn.textContent="Incorrect 😢"; submitBtn.classList.add("pop");
+      submitBtn.textContent="Incorrect 😢"; rePop(submitBtn);
       submitBtn.classList.add("btn-bad","active");
       try { $("#sndBad").play(); } catch{}
-      try { if (typeof navigator.vibrate==="function") navigator.vibrate([80,40,80]); } catch{}
+      try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
     }
     if (ok) confettiFrom(submitBtn);
 
@@ -605,10 +612,13 @@ function presentMastery(item) {
 
 
 function advanceAfterMasteryFeedback() {
+  // If pool empty → move on
   if (!State.masteryPool.length) { return nextTopic(); }
 
+  // Next item in current sweep
   State.masteryIndex++;
   if (State.masteryIndex >= State.masteryPool.length) {
+    // End of sweep: if items remain, start next attempt immediately; otherwise next topic
     if (State.masteryPool.length) {
       State.attemptNumber++;
       State.masteryPool = shuffle(State.masteryPool);
@@ -618,49 +628,43 @@ function advanceAfterMasteryFeedback() {
       return nextTopic();
     }
   }
-  // Continue current sweep
-  State.masteryIndex++;
-  if (State.masteryIndex >= State.masteryPool.length) {
-    // end of sweep → summarize and, if needed, continue Attempt 3,4...
-    const len = State.masteryPool.length;
-    const attempted = State.trials.filter(t => t.topic===State.currentTopic && t.phase==="mastery" && t.attempt===State.attemptNumber).length;
-    const correctThisAttempt = State.trials.filter(t => t.topic===State.currentTopic && t.phase==="mastery" && t.attempt===State.attemptNumber && t.correct===1).length;
-    setText("#attemptTitle", `Attempt ${State.attemptNumber} summary`);
-    setText("#attemptStats", `total correct = ${correctThisAttempt}/${attempted}`);
-    setText("#attemptNext", len ? `To re-attempt: ${len}` : "All correct — great job!");
-    show("#fpSummary");
-    const onKey=(e)=>{ if (e.key==="Enter"){ cleanup(); proceed(); } };
-    const cleanup=()=>document.removeEventListener("keydown", onKey);
-    const proceed=()=>{
-      if (!State.masteryPool.length) return nextTopic();
-      State.attemptNumber++;
-      State.masteryPool = shuffle(State.masteryPool);
-      State.masteryIndex = 0;
-      presentMastery(State.masteryPool[State.masteryIndex]);
-    };
-    document.addEventListener("keydown", onKey);
-    $("#beginMasteryBtn").onclick=()=>{ cleanup(); proceed(); };
-    return;
-  }
   presentMastery(State.masteryPool[State.masteryIndex]);
 }
 
 
 function showSummary() {
   show("#summary");
-  $("#uploadStatus").textContent = "Click 'Check/Retry Upload' to send your results.";
-  $("#submitResultsBtn").disabled = false;
-  $("#submitResultsBtn").onclick = autoUploadInteractive;
+  $("#uploadStatus").textContent = "Uploading in background…";
+  // 2s lockout while the background upload starts
+  const btn = $("#submitResultsBtn");
+  btn.disabled = true;
+  setTimeout(()=>{ btn.disabled = false; }, 2000);
+
+  // start background upload
+  uploadedOnce = false;
+  lastUploadOk = false;
+  autoUploadOnce();
+
+  // click: advance if already ok, else retry upload
+  btn.onclick = autoUploadInteractive;
 }
 
 
 let uploadedOnce = false;
+let lastUploadOk = false;
+
 
 async function autoUploadInteractive() {
   const btn = $("#submitResultsBtn");
   btn.disabled = true;
-  $("#uploadStatus").textContent = "Uploading…";
 
+  if (lastUploadOk) {
+    $("#uploadStatus").textContent = "Upload already recorded.";
+    setTimeout(()=>show("#thankyou"), 300);
+    return;
+  }
+
+  $("#uploadStatus").textContent = "Uploading…";
   const payload = {
     student_number: State.studentNumber,
     week: State.week,
@@ -672,9 +676,7 @@ async function autoUploadInteractive() {
   };
 
   let url = "/api/ingest";
-  if (location.hostname.endsWith(".pages.dev")) {
-    url = CONFIG.WORKER_FALLBACK_URL;
-  }
+  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL;
 
   try {
     const res = await fetch(url, {
@@ -683,23 +685,23 @@ async function autoUploadInteractive() {
       body: JSON.stringify(payload),
       cache: "no-store"
     });
-    const ok = res.ok;
-    const text = await res.text();
-    if (!ok) throw new Error(text || String(res.status));
-
-    $("#uploadStatus").textContent = "Upload recorded (or already exists).";
-    setTimeout(()=>show("#thankyou"), 700);
+    if (!res.ok) throw new Error(await res.text());
+    uploadedOnce = true;
+    lastUploadOk = true;
+    $("#uploadStatus").textContent = "Upload recorded.";
+    setTimeout(()=>show("#thankyou"), 500);
   } catch (err) {
     console.error(err);
+    lastUploadOk = false;
     $("#uploadStatus").textContent = "Upload failed. Click 'Check/Retry Upload' to try again.";
     btn.disabled = false;
   }
 }
 
+
 async function autoUploadOnce() {
   if (uploadedOnce) return;
   const btn = $("#submitResultsBtn");
-  btn.disabled = true;
   $("#uploadStatus").textContent = "Uploading…";
 
   const payload = {
@@ -712,11 +714,8 @@ async function autoUploadOnce() {
     trials: State.trials,
   };
 
-  // Choose endpoint: dev or prod
   let url = "/api/ingest";
-  if (location.hostname.endsWith(".pages.dev")) {
-    url = CONFIG.WORKER_FALLBACK_URL; // must be set
-  }
+  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL;
 
   try {
     const res = await fetch(url, {
@@ -725,20 +724,19 @@ async function autoUploadOnce() {
       body: JSON.stringify(payload),
       cache: "no-store"
     });
-    const ok = res.ok;
-    const text = await res.text();
-    if (!ok) throw new Error(text || String(res.status));
-
+    if (!res.ok) throw new Error(await res.text());
     uploadedOnce = true;
+    lastUploadOk = true;
     $("#uploadStatus").textContent = "Upload recorded (or already exists).";
-    btn.disabled = true;
-    setTimeout(()=>show("#thankyou"), 700);
+    // no auto-advance; wait for user click
   } catch (err) {
     console.error(err);
-    $("#uploadStatus").textContent = "Upload failed. Click the button to retry.";
+    lastUploadOk = false;
+    $("#uploadStatus").textContent = "Background upload failed. Click 'Check/Retry Upload' to try again.";
     btn.disabled = false;
   }
 }
+
 
 window.addEventListener("load", async () => {
   try { await loadCSV(); } catch (e) { console.error(e); toast("CSV failed to load. Ensure items.csv is in the same folder."); }
