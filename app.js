@@ -29,6 +29,12 @@ const CONFIG = {
     organic: 1,
     inorganic: 1 // inorganic gets goal 4 if week=12
   },
+  CONFETTI: {
+    PIECES: 100,      // how many pieces
+    SPEED: 1.5,       // velocity multiplier (higher = faster)
+    GRAVITY: 0.06,    // gravity per frame (higher = falls faster)
+    DURATION_FRAMES: 120 // how long the animation runs
+  },
   // Dev upload fallback: if running on pages.dev, use workers.dev endpoint
   WORKER_FALLBACK_URL: "https://srp-results-worker.rjmaligaya.workers.dev/api/ingest", // TODO: fill in
 };
@@ -98,6 +104,19 @@ const State = {
 // Detect mobile once and tag <html>
 const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
 if (isMobile) document.documentElement.classList.add("mobile");
+
+if (isMobile) {
+  // Prevent any HTML-level autofocus from triggering keyboards
+  document.querySelectorAll("[autofocus], [data-autofocus]").forEach(el => {
+    el.removeAttribute("autofocus");
+    el.removeAttribute("data-autofocus");
+  });
+  // If something already focused, blur it
+  if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
+}
+
 
 // Keyboard-aware class without fighting scrolling (works nicer on iOS/Android)
 (function (){
@@ -176,10 +195,13 @@ function show(sel) {
   document.querySelectorAll(".view").forEach(n => n.classList.add("hidden"));
   const view = document.querySelector(sel);
   view.classList.remove("hidden");
-  requestAnimationFrame(() => {
-    const target = view.querySelector("[data-autofocus]") || view.querySelector("input, textarea, select");
-    if (target && typeof target.focus === "function") target.focus({ preventScroll:true });
-  });
+  // 👇 Only auto-focus on desktop / non-mobile
+  if (!isMobile) {
+    requestAnimationFrame(() => {
+      const target = view.querySelector("[data-autofocus]") || view.querySelector("input, textarea, select");
+      if (target && typeof target.focus === "function") target.focus({ preventScroll:true });
+    });
+  }
 }
 function setText(sel, txt) { const n = $(sel); if (n) n.textContent = txt; }
 function setImage(sel, src) { const n = $(sel); if (n) n.src = src; }
@@ -543,31 +565,86 @@ function confettiFrom(el){
       document.body.appendChild(cvs);
       const onresize = ()=>{ cvs.width = window.innerWidth; cvs.height = window.innerHeight; };
       window.addEventListener("resize", onresize); onresize();
-    } else { cvs.width = window.innerWidth; cvs.height = window.innerHeight; }
+    } else {
+      cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+    }
+
     const ctx = cvs.getContext("2d");
-    const originX = rect.left + rect.width/2;
-    const originY = rect.top + rect.height/2;
-    const pieces = Array.from({length:80}, ()=>({x:originX,y:originY,vx:(Math.random()-0.5)*3,vy:-Math.random()*3-1,gr:0.06,rx:Math.random()*6.28,vr:0.2+Math.random()*0.4,w:4+Math.random()*4,h:8+Math.random()*8}));
-    const colors = ["#11b66a","#3a80ff","#f2c94c","#eb5757","#bb6bd9"];
-    let frames=0;
+    const { PIECES, SPEED, GRAVITY, DURATION_FRAMES } = (CONFIG.CONFETTI || {});
+    const left = rect.left, top = rect.top, w = rect.width, h = rect.height;
+
+    // create pieces along the edges of the button
+    const rand = (a,b)=> a + Math.random()*(b-a);
+    const pieces = Array.from({length: PIECES}, () => {
+      const side = (Math.random()*4)|0; // 0=top,1=bottom,2=left,3=right
+      let x, y, vx, vy;
+
+      switch (side) {
+        case 0: // top edge, shoot up
+          x = left + Math.random()*w;
+          y = top;
+          vx = rand(-1.2, 1.2) * SPEED;
+          vy = rand(-3.0, -1.6) * SPEED;
+          break;
+        case 1: // bottom edge, shoot down
+          x = left + Math.random()*w;
+          y = top + h;
+          vx = rand(-1.2, 1.2) * SPEED;
+          vy = rand(1.6, 3.0) * SPEED;
+          break;
+        case 2: // left edge, shoot left
+          x = left;
+          y = top + Math.random()*h;
+          vx = rand(-3.0, -1.6) * SPEED;
+          vy = rand(-1.2, 1.2) * SPEED;
+          break;
+        default: // right edge, shoot right
+          x = left + w;
+          y = top + Math.random()*h;
+          vx = rand(1.6, 3.0) * SPEED;
+          vy = rand(-1.2, 1.2) * SPEED;
+          break;
+      }
+
+      return {
+        x, y, vx, vy,
+        gr: GRAVITY,
+        rx: Math.random()*6.28,         // rotation
+        vr: 0.2 + Math.random()*0.4,    // spin speed
+        w: 4 + Math.random()*4,
+        h: 8 + Math.random()*8,
+        color: ["#11b66a","#3a80ff","#f2c94c","#eb5757","#bb6bd9"][(Math.random()*5)|0]
+      };
+    });
+
+    let frames = 0;
     function tick(){
       frames++;
       ctx.clearRect(0,0,cvs.width,cvs.height);
-      pieces.forEach(p=>{
-        p.vy += p.gr;
-        p.x += p.vx; p.y += p.vy; p.rx += p.vr;
+      for (const p of pieces){
+        p.vy += p.gr;         // gravity
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.rx += p.vr;
+
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rx);
-        ctx.fillStyle = colors[(Math.random()*colors.length)|0];
+        ctx.fillStyle = p.color;
         ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
         ctx.restore();
-      });
-      if (frames<120) requestAnimationFrame(tick); else ctx.clearRect(0,0,cvs.width,cvs.height);
+      }
+      if (frames < DURATION_FRAMES) {
+        requestAnimationFrame(tick);
+      } else {
+        ctx.clearRect(0,0,cvs.width,cvs.height);
+      }
     }
     tick();
   }catch(e){}
 }
+
+
 function confettiBurst(){ // legacy fallback
 
   const cvs = $("#confetti");
