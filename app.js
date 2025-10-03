@@ -185,7 +185,6 @@ function showWeekIntro() {
   // Build prediction prompt per current topic to be shown on topic intro instead; but the user wants it before each quiz.
   // We'll collect prediction here per upcoming topic when we enter topicIntro; for now show a neutral screen.
   show("#weekIntro");
-  setText("#predictPrompt", "Predict how many you will get correct (1–10).");
   // Build buttons 1..10
   const wrap = $("#predictBtns"); wrap.innerHTML = "";
   for (let i=1;i<=10;i++){
@@ -276,6 +275,10 @@ function labelForType(q_type){
   return "Give the correct IUPAC name of the following molecule";
 }
 
+function rePop(el){
+  try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
+}
+
 function presentItem(item, phase) {
   setImage("#qImage", item.image);
   setText("#answerLabel", labelForType(item.q_type));
@@ -304,10 +307,6 @@ function presentItem(item, phase) {
   const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
   document.addEventListener("keydown", onKey);
   $("#submitBtn").onclick = submit;
-
-  function rePop(el){
-  try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
-}
 
   
   function submit() {
@@ -479,7 +478,6 @@ function advanceFlow() {
 
   // Attempt 1 summary
   setText("#attemptTitle", "Attempt 1 Summary");
-  setText("#attemptStats", `Total Re-Attempts = ${State.masteryPool.length}`);
   const toRetry = State.masteryPool.length;
   if (toRetry===0){
     setText("#attemptNext", "All correct — great job!");
