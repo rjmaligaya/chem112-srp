@@ -155,15 +155,21 @@ function parseCSV(text) {
 }
 
 function initLanding() {
-  $("#startBtn").addEventListener("click", startSession);
+  // Click on Begin
+  $("#startBtn").addEventListener("click", (e) => {
+    const btn = e.currentTarget;
+    if (btn) rePop(btn);
+    setTimeout(startSession, 400);   // <— let the bounce show
+  });
+
   // Enter to start anywhere on landing
   document.addEventListener("keydown", (e)=>{
-  if ($("#landing") && !$("#landing").classList.contains("hidden") && e.key === "Enter") {
-    const start = $("#startBtn");
-    if (start) rePop(start);       // bounce the Start button visually
-    startSession();
-  }
-});
+    if ($("#landing") && !$("#landing").classList.contains("hidden") && e.key === "Enter") {
+      const start = $("#startBtn");
+      if (start) rePop(start);
+      setTimeout(startSession, 400); // <— same small delay
+    }
+  });
 }
 
 function startSession() {
@@ -207,16 +213,18 @@ function showWeekIntro() {
   const btn = $("#beginWeekBtn");
 
   const proceed = () => {
-    if (State.metaEstimate==null){
-      const w=$("#predictWarn");
-      w.textContent="Please select a number.";
-      w.style.display="block";
-      return;
-    }
-    if (btn) rePop(btn);         // bounce the Begin button
+  if (State.metaEstimate==null){
+    const w=$("#predictWarn");
+    w.textContent="Please select a number.";
+    w.style.display="block";
+    return;
+  }
+  if (btn) rePop(btn);
+  setTimeout(() => {   // <— delay lets bounce play
     cleanup();
     nextTopic();
-  };
+  }, 400);
+};
 
   const onKey = (e) => {
     if (e.key === "Enter") {
@@ -250,10 +258,20 @@ function showTopicIntro() {
 
   // Topic intro requires no extra action; enable Start once we enter
   const btn=$("#beginTopicBtn"); btn.disabled=false;
-  const onKey=(e)=>{ if (e.key==="Enter"){ rePop(btn); cleanup(); prepareTrialsForTopic(State.currentTopic); } };
+
+  const onKey=(e)=>{
+  if (e.key==="Enter"){
+    rePop(btn);
+    setTimeout(()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
+  }
+};
   const cleanup=()=>document.removeEventListener("keydown", onKey);
   document.addEventListener("keydown", onKey);
-  btn.onclick=()=>{ /* global click will also bounce, this is extra-safe */ rePop(btn); cleanup(); prepareTrialsForTopic(State.currentTopic); };
+
+btn.onclick=()=>{
+  rePop(btn);
+  setTimeout(()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
+};
 }
 
 function prepareTrialsForTopic(topic) {
@@ -768,4 +786,3 @@ window.addEventListener("load", async () => {
   initLanding();
   show("#landing");
 });
-
