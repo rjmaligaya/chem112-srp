@@ -99,21 +99,28 @@ const State = {
 const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
 if (isMobile) document.documentElement.classList.add("mobile");
 
-// Handle virtual keyboard: shrink image area when keyboard is open
-if (window.visualViewport) {
-  const vv = window.visualViewport;
-  const updateKB = () => {
-    const open = vv.height < window.innerHeight * 0.85;
-    document.documentElement.classList.toggle("kbd-open", open);
-    // Keep the focused input visible above the keyboard
-    const active = document.activeElement;
-    if (open && active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
-      active.scrollIntoView({ block: "center", behavior: "smooth" });
+// Keyboard-aware class without fighting scrolling (works nicer on iOS/Android)
+(function (){
+  let kbTimer = null;
+  const isTextField = el => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+  document.addEventListener("focusin", (e) => {
+    if (isMobile && isTextField(e.target)) {
+      // add a small delay so the browser can place the caret before we tweak layout
+      clearTimeout(kbTimer);
+      kbTimer = setTimeout(() => document.documentElement.classList.add("kbd-open"), 100);
     }
-  };
-  vv.addEventListener("resize", updateKB);
-  vv.addEventListener("scroll", updateKB);
-}
+  }, true);
+
+  document.addEventListener("focusout", (e) => {
+    if (isMobile && isTextField(e.target)) {
+      // remove the class shortly after blur so normal layout returns
+      clearTimeout(kbTimer);
+      kbTimer = setTimeout(() => document.documentElement.classList.remove("kbd-open"), 150);
+    }
+  }, true);
+})();
+
 
 // Topbar: Home + Instructions
 function attachTopbar() {
@@ -385,6 +392,18 @@ function rePop(el){
   try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
 }
 
+function shakeEl(el){
+  try {
+    // stop any active bounce first so the shake shows
+    el.classList.remove("pop");
+    void el.offsetWidth;             // reflow to reset animations
+    el.classList.add("shake");
+    el.addEventListener("animationend", () => {
+      el.classList.remove("shake");
+    }, { once: true });
+  } catch {}
+}
+
 // Global bounce for any button click (mouse/touch/spacebar-enter on focused button)
 document.addEventListener("click", (e) => {
   const b = e.target && e.target.closest && e.target.closest("button");
@@ -488,8 +507,7 @@ function presentItem(item, phase) {
       try { $("#sndBad").play(); } catch{}
       try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
       // Add a shake animation on wrong answers
-      submitBtn.classList.add("shake");
-      submitBtn.addEventListener("animationend", () => submitBtn.classList.remove("shake"), { once:true });
+      shakeEl(submitBtn);
     }
 
     // Confetti on correct
@@ -718,8 +736,7 @@ function presentMastery(item) {
       try { $("#sndBad").play(); } catch{}
       try { if (typeof navigator.vibrate==="function") navigator.vibrate([140,80,140,80,140]); } catch{}
       // Add a shake animation on wrong answers
-      submitBtn.classList.add("shake");
-      submitBtn.addEventListener("animationend", () => submitBtn.classList.remove("shake"), { once:true });
+      shakeEl(submitBtn);
     }
     if (ok) confettiFrom(submitBtn);
 
