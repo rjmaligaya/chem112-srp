@@ -449,8 +449,18 @@ function presentItem(item, phase) {
   $("#trialWarn").style.display="none";
   $("#inlineFeedback").style.display="none";
   $("#countdown").textContent="";
-  $("#answer").focus();
+  // 👇 show first
   show("#trial");
+
+  // 👇 only auto-focus on desktop
+  if (!isMobile) {
+    requestAnimationFrame(() => {
+      const ans = $("#answer");
+      if (ans && typeof ans.focus === "function") {
+        ans.focus({ preventScroll: true });
+      }
+    });
+  }
 
   const t0 = performance.now();
   const submitBtn=$("#submitBtn");
@@ -731,8 +741,18 @@ function presentMastery(item) {
   $("#trialWarn").style.display="none";
   $("#inlineFeedback").style.display="none";
   $("#countdown").textContent="";
-  $("#answer").focus();
+  // 👇 show first
   show("#trial");
+
+  // 👇 only auto-focus on desktop
+  if (!isMobile) {
+    requestAnimationFrame(() => {
+      const ans = $("#answer");
+      if (ans && typeof ans.focus === "function") {
+        ans.focus({ preventScroll: true });
+      }
+    });
+  }
   const t0 = performance.now();
 
   const submitBtn=$("#submitBtn");
