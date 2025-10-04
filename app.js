@@ -361,6 +361,25 @@ function showWeekIntro() {
 
   document.addEventListener("keydown", onKey);
   btn.onclick = proceed;
+
+// Inline instructions toggle (no navigation, keeps their student & week)
+const toggle = $("#toggleInlineInstr");
+const panel  = $("#inlineInstr");
+if (toggle && panel) {
+  toggle.onclick = () => {
+    const open = panel.classList.toggle("open");
+    if (open) { panel.hidden = false; }
+    // allow the transition to run even when we just un-hid it
+    requestAnimationFrame(() => panel.classList.toggle("open", open));
+    toggle.setAttribute("aria-expanded", String(open));
+    toggle.textContent = open ? "Hide instructions" : "Show instructions";
+
+    // When closing, hide after the animation so tab order stays nice
+    if (!open) {
+      panel.addEventListener("transitionend", () => { panel.hidden = true; }, { once: true });
+    }
+  };
+}
 }
 
 
