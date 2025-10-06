@@ -197,7 +197,7 @@ function attachTopbar() {
 
   if (home) home.onclick = () => bounceAnd(home, goHome);
   if (instr) instr.onclick = () => bounceAnd(instr, showInstructions);
-  if (back)  back.onclick  = () => bounceAnd(back, () => { show(lastView); });
+  if (back)  back.onclick  = () => bounceAnd(back, () => { show(goHome); });
 }
 
 
