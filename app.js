@@ -1,5 +1,7 @@
 /* Big update per user's spec: inline feedback, meta-comprehension, dev uploads, week/topic changes */
 
+let lastView = "#landing"; 
+
 const CONFIG = {
   CSV_URL: "items.csv",
   FEEDBACK_MS: 5000, // 5 sec with visible countdown
@@ -195,7 +197,7 @@ function attachTopbar() {
 
   if (home) home.onclick = () => bounceAnd(home, goHome);
   if (instr) instr.onclick = () => bounceAnd(instr, showInstructions);
-  if (back)  back.onclick  = () => bounceAnd(back, () => { show("#landing"); });
+  if (back)  back.onclick  = () => bounceAnd(back, () => { show(lastView); });
 }
 
 
@@ -253,6 +255,10 @@ function show(sel) {
   document.querySelectorAll("button.pop, button.shake").forEach(b => {
   b.classList.remove("pop", "shake");
 });
+
+// record current visible view before switching
+  const current = document.querySelector(".view:not(.hidden)");
+  if (current && current.id) lastView = `#${current.id}`;
 
 
   document.querySelectorAll(".view").forEach(n => n.classList.add("hidden"));
