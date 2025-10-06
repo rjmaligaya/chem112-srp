@@ -44,50 +44,8 @@
     .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0d1218}
     .btn-row{display:flex;gap:8px;flex-wrap:wrap}
     .predict button{flex:1;min-width:46px}
-  
 
-    /* Layout for the Instructions view: header stays on top, PDF fills below */
-    #instructions {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* Make the card content that wraps the iframe flex, so the iframe can stretch */
-    #instructions .instr-card {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* Let the iframe actually use the available vertical space in the card */
-    #instructions .instr-body {
-      flex: 1 1 auto;
-      min-height: 0; /* critical in flex layouts so children can shrink */
-    }
-
-    #instrFrame {
-      display: block;
-      width: 100%;
-      height: 70vh;      /* your previous height, but now it can stretch correctly */
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: #fff;
-    }
-
-    /* Make the *inner* Instructions header non-sticky so you don’t get two sticky bars */
-    #instructions > .topbar {
-      position: static;
-      padding-left: 16px;   /* optional spacing to match */
-      padding-right: 16px;  /* optional spacing to match */
-    }
-
-    /* When Instructions are visible, hide the global title & intro text in .container */
-    #instructions:not(.hidden) ~ .container > h1,
-    #instructions:not(.hidden) ~ .container > p.muted:first-of-type {
-      display: none;
-    }
-
+    
     /* --- Topbar --- */
     .topbar{
       position:sticky; top:0; z-index:10;
@@ -168,23 +126,18 @@
   </div>
 
   <!-- Instructions -->
-  <div id="instructions" class="view hidden">
-    <!-- Local page title for the Instructions view -->
-    <header class="topbar" style="justify-content: space-between;">
-      <button id="backFromInstr">← Back</button>
-      <h1 style="margin:0;">CHEM 112 Weekly Flashcards 📚</h1>
-    </header>
-
-    <!-- Card wrapper for the actual instructions content -->
-    <div class="card instr-card">
-      <h2>Instructions</h2>
-      <p class="muted">Read the study instructions below. Use the Back button when you’re ready.</p>
-
-      <div class="instr-body">
-        <iframe id="instrFrame" src="instructions.pdf" title="Instructions PDF"></iframe>
-      </div>
+  <div id="instructions" class="view card hidden">
+    <h2>Instructions</h2>
+    <p class="muted">Read the study instructions below. Use the Back button when you’re ready.</p>
+    <div style="margin:10px 0;">
+      <iframe id="instrFrame" src="instructions.pdf" title="Instructions PDF"
+              style="width:100%;height:70vh;border:1px solid var(--border);border-radius:12px;background:#fff;"></iframe>
+    </div>
+    <div class="actions">
+      <button id="backFromInstr">Back</button>
     </div>
   </div>
+
 
 
   <div class="container">
