@@ -181,6 +181,9 @@ if (ENABLE_KB_ADJUST) {
   }, true);
 })();
 
+function resetAndGoHome() {
+  goHome(); // already does runCleanups() + State.session++ + resets + show("#landing")
+}
 
 // Topbar: Home + Instructions
 function attachTopbar() {
@@ -195,9 +198,9 @@ function attachTopbar() {
   const instr = document.getElementById("instrBtn");
   const back  = document.getElementById("backFromInstr");
 
-  if (home) home.onclick = () => bounceAnd(home, goHome);
-  if (instr) instr.onclick = () => bounceAnd(instr, showInstructions);
-  if (back)  back.onclick  = () => bounceAnd(back, () => { show(goHome); });
+  if (home) home.onclick = () => bounceAnd(home, resetAndGoHome);
+  if (instr) instr.onclick = () => bounceAnd(instr, resetAndGoHome);
+  if (back)  back.onclick  = () => bounceAnd(back,  resetAndGoHome);
 }
 
 
