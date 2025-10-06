@@ -2,7 +2,7 @@
 
 const CONFIG = {
   CSV_URL: "items.csv",
-  FEEDBACK_MS: 5000, // 3 sec with visible countdown
+  FEEDBACK_MS: 5000, // 5 sec with visible countdown
   MAX_ANSWER_LEN: 120,
   UNIT_MAPS: [
     { re: /\bm\/s\b/g, to: "m s^-1" },
@@ -101,6 +101,19 @@ const State = {
   metaEstimate: null,
 };
 
+// Track current "session" and pending cleanups/timers
+State.session = 0;
+State.cleanups = new Set();
+
+function addCleanup(fn) { if (typeof fn === "function") State.cleanups.add(fn); }
+function runCleanups() {
+  for (const fn of State.cleanups) {
+    try { fn(); } catch {}
+  }
+  State.cleanups.clear();
+}
+
+
 // Detect mobile once and tag <html>
 const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
 if (isMobile) document.documentElement.classList.add("mobile");
@@ -169,20 +182,28 @@ if (ENABLE_KB_ADJUST) {
 
 // Topbar: Home + Instructions
 function attachTopbar() {
-  const bounceAnd = (el, fn) => { if (el) { rePop(el); setTimeout(fn, 400); } };
+  const bounceAnd = (el, fn) => {
+    if (!el) return;
+    rePop(el);
+    const sid = State.session;
+    setTimeout(() => { if (sid !== State.session) return; fn(); }, 400);
+  };
+
   const home = document.getElementById("homeBtn");
   const instr = document.getElementById("instrBtn");
-  const back = document.getElementById("backFromInstr");
+  const back  = document.getElementById("backFromInstr");
 
   if (home) home.onclick = () => bounceAnd(home, goHome);
   if (instr) instr.onclick = () => bounceAnd(instr, showInstructions);
-  if (back)  back.onclick  = () => bounceAnd(back, () => {
-    // return to the Start screen (or change to previous view if you prefer)
-    show("#landing");
-  });
+  if (back)  back.onclick  = () => bounceAnd(back, () => { show("#landing"); });
 }
 
+
 function goHome() {
+  // cancel any active listeners/timers from prior views
+  runCleanups();
+  State.session++; // invalidate in-flight callbacks
+
   // soft reset
   State.week = null;
   State.topicsQueue = [];
@@ -204,8 +225,16 @@ function goHome() {
   if (s) s.value = "";
   if (w) w.value = "6";
 
+  // remove full-screen confetti canvas if present
+  const conf = document.getElementById("confettiFull");
+  if (conf && conf.parentNode) conf.parentNode.removeChild(conf);
+
+  try { const a = $("#sndOk"); a.pause(); a.currentTime = 0; } catch {}
+  try { const b = $("#sndBad"); b.pause(); b.currentTime = 0; } catch {}
+
   show("#landing");
 }
+
 
 function showInstructions() {
   // Ensure the iframe is pointed at your pdf (already is by default)
@@ -217,7 +246,11 @@ function showInstructions() {
 
 // DOM helpers
 function $(sel) { return document.querySelector(sel); }
+
 function show(sel) {
+  // whenever we swap views, clear old listeners/timers
+  runCleanups();
+
   document.querySelectorAll(".view").forEach(n => n.classList.add("hidden"));
   const view = document.querySelector(sel);
   view.classList.remove("hidden");
@@ -282,20 +315,28 @@ function initLanding() {
   $("#startBtn").addEventListener("click", (e) => {
     const btn = e.currentTarget;
     if (btn) rePop(btn);
-    setTimeout(startSession, 400);   // <— let the bounce show
+    const sid = State.session;
+    setTimeout(() => { if (sid !== State.session) return; startSession(); }, 400);
   });
 
   // Enter to start anywhere on landing
-  document.addEventListener("keydown", (e)=>{
+  const onKey = (e) => {
     if ($("#landing") && !$("#landing").classList.contains("hidden") && e.key === "Enter") {
       const start = $("#startBtn");
       if (start) rePop(start);
-      setTimeout(startSession, 400); // <— same small delay
+      const sid = State.session;
+      setTimeout(() => { if (sid !== State.session) return; startSession(); }, 400);
     }
-  });
+  };
+  document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
 }
 
+
 function startSession() {
+  runCleanups();     // clear any leftovers just in case
+  State.session++;   // new session; invalidate old timers
+
   const student = $("#student").value.trim();
   const week = Number($("#week").value);
   const warn = $("#landingWarn");
@@ -325,9 +366,7 @@ function showWeekIntro() {
       State.metaEstimate = i;
       $("#beginWeekBtn").disabled=false;
       $("#predictWarn").style.display="none";
-      [...wrap.children].forEach(ch=>{
-        ch.classList.remove("active","btn-ok","btn-bad");
-      });
+      [...wrap.children].forEach(ch=>ch.classList.remove("active","btn-ok","btn-bad"));
       b.classList.add("active","btn-ok");
     };
     wrap.appendChild(b);
@@ -336,51 +375,43 @@ function showWeekIntro() {
   const btn = $("#beginWeekBtn");
 
   const proceed = () => {
-  if (State.metaEstimate==null){
-    const w=$("#predictWarn");
-    w.textContent="Please select a number.";
-    w.style.display="block";
-    return;
-  }
-  if (btn) rePop(btn);
-  setTimeout(() => {   // <— delay lets bounce play
-    cleanup();
-    nextTopic();
-  }, 400);
-};
-
-  const onKey = (e) => {
-    if (e.key === "Enter") {
-      proceed();
+    if (State.metaEstimate==null){
+      const w=$("#predictWarn");
+      w.textContent="Please select a number.";
+      w.style.display="block";
+      return;
     }
+    if (btn) rePop(btn);
+    const sid = State.session;
+    setTimeout(() => {
+      if (sid !== State.session) return;
+      cleanup();
+      nextTopic();
+    }, 400);
   };
 
-  const cleanup = () => {
-    document.removeEventListener("keydown", onKey);
-  };
+  const onKey = (e) => { if (e.key === "Enter") proceed(); };
+  const cleanup = () => { document.removeEventListener("keydown", onKey); };
 
   document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
   btn.onclick = proceed;
 
-// Inline instructions toggle (no navigation, keeps their student & week)
-const toggle = $("#toggleInlineInstr");
-const panel  = $("#inlineInstr");
-if (toggle && panel) {
-  toggle.onclick = () => {
-    const open = panel.classList.toggle("open");
-    if (open) { panel.hidden = false; }
-    // allow the transition to run even when we just un-hid it
-    requestAnimationFrame(() => panel.classList.toggle("open", open));
-    toggle.setAttribute("aria-expanded", String(open));
-    toggle.textContent = open ? "Hide instructions" : "Show instructions";
+  // Inline instructions toggle unchanged...
+  const toggle = $("#toggleInlineInstr");
+  const panel  = $("#inlineInstr");
+  if (toggle && panel) {
+    toggle.onclick = () => {
+      const open = panel.classList.toggle("open");
+      if (open) { panel.hidden = false; }
+      requestAnimationFrame(() => panel.classList.toggle("open", open));
+      toggle.setAttribute("aria-expanded", String(open));
+      toggle.textContent = open ? "Hide instructions" : "Show instructions";
+      if (!open) panel.addEventListener("transitionend", () => { panel.hidden = true; }, { once: true });
+    };
+  }
+}
 
-    // When closing, hide after the animation so tab order stays nice
-    if (!open) {
-      panel.addEventListener("transitionend", () => { panel.hidden = true; }, { once: true });
-    }
-  };
-}
-}
 
 
 function nextTopic() {
@@ -398,23 +429,27 @@ function showTopicIntro() {
     : "You will practice this topic until you master all items at least once.");
   show("#topicIntro");
 
-  // Topic intro requires no extra action; enable Start once we enter
-  const btn=$("#beginTopicBtn"); btn.disabled=false;
+  const btn = $("#beginTopicBtn"); 
+  btn.disabled = false;
 
-  const onKey=(e)=>{
-  if (e.key==="Enter"){
-    rePop(btn);
-    setTimeout(()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
-  }
-};
-  const cleanup=()=>document.removeEventListener("keydown", onKey);
+  const onKey = (e) => {
+    if (e.key === "Enter"){
+      rePop(btn);
+      const sid = State.session;
+      setTimeout(() => { if (sid !== State.session) return; cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
+    }
+  };
+  const cleanup = () => document.removeEventListener("keydown", onKey);
   document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
 
-btn.onclick=()=>{
-  rePop(btn);
-  setTimeout(()=>{ cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
-};
+  btn.onclick = () => {
+    rePop(btn);
+    const sid = State.session;
+    setTimeout(() => { if (sid !== State.session) return; cleanup(); prepareTrialsForTopic(State.currentTopic); }, 400);
+  };
 }
+
 
 function prepareTrialsForTopic(topic) {
   const key = `${topic}|${State.week}`;
@@ -479,6 +514,7 @@ document.addEventListener("click", (e) => {
 
 
 function presentItem(item, phase) {
+  const sid = State.session;
   setImage("#qImage", item.image);
   setText("#answerLabel", labelForType(item.q_type));
   $("#answer").value = "";
@@ -515,6 +551,7 @@ function presentItem(item, phase) {
 
   const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
   document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
   $("#submitBtn").onclick = submit;
 
   
@@ -601,14 +638,27 @@ function presentItem(item, phase) {
 }
 
 function startCountdown(done){
-  const label=$("#countdown");
-  let t = Math.max(1, Math.round(CONFIG.FEEDBACK_MS/1000)); // now 5
+  const sid = State.session;
+  const label = $("#countdown");
+  let t = Math.max(1, Math.round(CONFIG.FEEDBACK_MS/1000));
   label.textContent = `Continuing in ${t}…`;
-  const id=setInterval(()=>{
-    t--; if (t<=0){ clearInterval(id); label.textContent=""; done(); }
-    else label.textContent = `Continuing in ${t}…`;
+  const id = setInterval(() => {
+    if (sid !== State.session) { clearInterval(id); return; } // session changed; stop
+    t--;
+    if (t <= 0) {
+      clearInterval(id);
+      label.textContent = "";
+      // only run 'done' if we’re still in this session
+      if (sid === State.session) done();
+      return;
+    }
+    label.textContent = `Continuing in ${t}…`;
   }, 1000);
+
+  // ensure we clear it on navigation/Home
+  addCleanup(() => clearInterval(id));
 }
+
 
 function confettiFrom(el){
   try{
@@ -620,6 +670,7 @@ function confettiFrom(el){
       document.body.appendChild(cvs);
       const onresize = ()=>{ cvs.width = window.innerWidth; cvs.height = window.innerHeight; };
       window.addEventListener("resize", onresize); onresize();
+      addCleanup(() => window.removeEventListener("resize", onresize));
     } else {
       cvs.width = window.innerWidth; cvs.height = window.innerHeight;
     }
@@ -734,7 +785,7 @@ function advanceFlow() {
     State.fpIndex++;
     return presentItem(State.firstPass[State.fpIndex], "first_pass");
   }
-  // Build mastery pool
+
   if (State.masteryGoal > 1) {
     State.masteryPool = State.firstPass.filter(it => (State.correctCounts.get(it.id) || 0) < State.masteryGoal);
   } else {
@@ -742,7 +793,6 @@ function advanceFlow() {
     State.masteryPool = State.firstPass.filter(it => missedIds.has(it.id));
   }
 
-  // Attempt 1 summary
   setText("#attemptTitle", "Attempt 1 Summary");
   const toRetry = State.masteryPool.length;
   if (toRetry===0){
@@ -751,17 +801,21 @@ function advanceFlow() {
     const onKey=(e)=>{ if (e.key==="Enter"){ cleanup(); nextTopic(); } };
     const cleanup=()=>document.removeEventListener("keydown", onKey);
     document.addEventListener("keydown", onKey);
+    addCleanup(() => document.removeEventListener("keydown", onKey));
     $("#beginMasteryBtn").onclick=()=>{ cleanup(); nextTopic(); };
     return;
   } else {
     setText("#attemptNext", `To Re-Attempt: ${toRetry}`);
   }
+
   show("#fpSummary");
   const onKey=(e)=>{ if (e.key==="Enter"){ cleanup(); startMasteryLoop(); } };
   const cleanup=()=>document.removeEventListener("keydown", onKey);
   document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
   $("#beginMasteryBtn").onclick=()=>{ cleanup(); startMasteryLoop(); };
 }
+
 
 function startMasteryLoop() {
   if (!State.masteryPool.length) return nextTopic();
@@ -772,6 +826,7 @@ function startMasteryLoop() {
 }
 
 function presentMastery(item) {
+  const sid = State.session;
   setImage("#qImage", item.image);
   setText("#answerLabel", labelForType(item.q_type));
   $("#answer").value = "";
@@ -808,6 +863,7 @@ function presentMastery(item) {
 
   const onKey = (e)=>{ if (e.key === "Enter") { e.preventDefault(); submit(); } };
   document.addEventListener("keydown", onKey);
+  addCleanup(() => document.removeEventListener("keydown", onKey));
   $("#submitBtn").onclick = submit;
 
   function submit() {
@@ -914,8 +970,9 @@ function showSummary() {
   // 2s lockout while the background upload starts
   const btn = $("#submitResultsBtn");
   btn.disabled = true;
-  setTimeout(()=>{ btn.disabled = false; }, 2000);
-
+  const sid = State.session;
+  const t = setTimeout(() => { if (sid !== State.session) return; btn.disabled = false; }, 2000);
+  addCleanup(() => clearTimeout(t));
   // start background upload
   uploadedOnce = false;
   lastUploadOk = false;
@@ -936,7 +993,9 @@ async function autoUploadInteractive() {
 
   if (lastUploadOk) {
     $("#uploadStatus").textContent = "Upload already recorded.";
-    setTimeout(()=>show("#thankyou"), 300);
+    const sid = State.session;
+    const t = setTimeout(() => { if (sid !== State.session) return; show("#thankyou"); }, 300);
+    addCleanup(() => clearTimeout(t));
     return;
   }
 
@@ -965,7 +1024,9 @@ async function autoUploadInteractive() {
     uploadedOnce = true;
     lastUploadOk = true;
     $("#uploadStatus").textContent = "Upload recorded.";
-    setTimeout(()=>show("#thankyou"), 500);
+    const sid = State.session;
+    const t = setTimeout(() => { if (sid !== State.session) return; show("#thankyou"); }, 500);
+    addCleanup(() => clearTimeout(t));
   } catch (err) {
     console.error(err);
     lastUploadOk = false;
