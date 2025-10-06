@@ -250,6 +250,10 @@ function $(sel) { return document.querySelector(sel); }
 function show(sel) {
   // whenever we swap views, clear old listeners/timers
   runCleanups();
+  document.querySelectorAll("button.pop, button.shake").forEach(b => {
+  b.classList.remove("pop", "shake");
+});
+
 
   document.querySelectorAll(".view").forEach(n => n.classList.add("hidden"));
   const view = document.querySelector(sel);
@@ -491,8 +495,15 @@ function labelForType(q_type){
 }
 
 function rePop(el){
-  try { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); } catch {}
+  try {
+    el.classList.remove("pop");
+    void el.offsetWidth;              // restart animation
+    el.classList.add("pop");
+    const onEnd = () => { el.classList.remove("pop"); };
+    el.addEventListener("animationend", onEnd, { once: true });
+  } catch {}
 }
+
 
 function shakeEl(el){
   try {
