@@ -59,7 +59,7 @@ IN_W12_FILL_02,inorganic,12,images/inorganic/w12/fill_02.png,II,fill,copper(____
 IN_W12_FILL_03,inorganic,12,images/inorganic/w12/fill_03.png,oxide,fill,magnesium ______
 IN_W12_FILL_04,inorganic,12,images/inorganic/w12/fill_04.png,carbonate,fill,sodium ______
 IN_W12_FILL_05,inorganic,12,images/inorganic/w12/fill_05.png,II,fill,tin(______) bromide
-IN_W12_FILL_06,inorganic,12,images/inorganic/w12/fill_06.png,phosphorus,fill,______ pentachloride
+IN_W12_FILL_06,inorganic,12,images/inorganic/w12/fill_06.png,phosphorus||phosphorous,fill,______ pentachloride
 IN_W12_FILL_07,inorganic,12,images/inorganic/w12/fill_07.png,hydroxide,fill,calcium ______
 IN_W12_FILL_08,inorganic,12,images/inorganic/w12/fill_08.png,dichromate,fill,potassium ______
 IN_W12_FILL_09,inorganic,12,images/inorganic/w12/fill_09.png,II,fill,lead(______) sulfide
@@ -69,7 +69,7 @@ IN_W12_FILL_12,inorganic,12,images/inorganic/w12/fill_12.png,nitrite,fill,sodium
 IN_W12_FILL_13,inorganic,12,images/inorganic/w12/fill_13.png,permanganate,fill,calcium ______
 IN_W12_FILL_14,inorganic,12,images/inorganic/w12/fill_14.png,IV,fill,titanium(______) oxide
 IN_W12_FILL_15,inorganic,12,images/inorganic/w12/fill_15.png,III,fill,chromium(______) chloride
-IN_W12_FILL_16,inorganic,12,images/inorganic/w12/fill_16.png,diphosphorus,fill,______ pentoxide
+IN_W12_FILL_16,inorganic,12,images/inorganic/w12/fill_16.png,diphosphorus||diphosphorous,fill,______ pentoxide
 IN_W12_FILL_17,inorganic,12,images/inorganic/w12/fill_17.png,sulfate,fill,ammonium ______
 IN_W12_FILL_18,inorganic,12,images/inorganic/w12/fill_18.png,IV,fill,tin(______) iodide
 IN_W12_FILL_19,inorganic,12,images/inorganic/w12/fill_19.png,II,fill,mercury(______) oxide
@@ -87,7 +87,7 @@ IN_W12_FILL_30,inorganic,12,images/inorganic/w12/fill_30.png,dichloride,fill,din
 IN_W12_FILL_31,inorganic,12,images/inorganic/w12/fill_31.png,III,fill,antimony(______) chloride
 IN_W12_FILL_32,inorganic,12,images/inorganic/w12/fill_32.png,chloride,fill,ammonium ______
 IN_W12_FILL_33,inorganic,12,images/inorganic/w12/fill_33.png,hydrogen carbonate||bicarbonate,fill,potassium ______
-IN_W12_FILL_34,inorganic,12,images/inorganic/w12/fill_34.png,tetroxide,fill,dinitrogen ______
+IN_W12_FILL_34,inorganic,12,images/inorganic/w12/fill_34.png,tetroxide||tetraoxide,fill,dinitrogen ______
 IN_W12_FILL_35,inorganic,12,images/inorganic/w12/fill_35.png,trichloride,fill,iodine ______
 IN_W12_IUPAC_01,inorganic,12,images/inorganic/w12/iupac_01.png,iron(III) chloride||iron (III) chloride,iupac,
 IN_W12_IUPAC_02,inorganic,12,images/inorganic/w12/iupac_02.png,calcium permanganate,iupac,
@@ -96,7 +96,7 @@ IN_W12_IUPAC_04,inorganic,12,images/inorganic/w12/iupac_04.png,potassium carbona
 IN_W12_IUPAC_05,inorganic,12,images/inorganic/w12/iupac_05.png,vanadium(III) oxide||vanadium (III) oxide,iupac,
 IN_W12_IUPAC_06,inorganic,12,images/inorganic/w12/iupac_06.png,sulfur hexafluoride,iupac,
 IN_W12_IUPAC_07,inorganic,12,images/inorganic/w12/iupac_07.png,antimony(III) chloride||antimony (III) chloride,iupac,
-IN_W12_IUPAC_08,inorganic,12,images/inorganic/w12/iupac_08.png,aluminum phosphate,iupac,
+IN_W12_IUPAC_08,inorganic,12,images/inorganic/w12/iupac_08.png,aluminum phosphate||aluminium phosphate,iupac,
 IN_W12_IUPAC_09,inorganic,12,images/inorganic/w12/iupac_09.png,lead(IV) oxide||lead (IV) oxide,iupac,
 IN_W12_IUPAC_10,inorganic,12,images/inorganic/w12/iupac_10.png,ammonium chloride,iupac,
 IN_W12_IUPAC_11,inorganic,12,images/inorganic/w12/iupac_11.png,iron(II) sulfate||iron (II) sulfate,iupac,
