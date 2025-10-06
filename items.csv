@@ -29,7 +29,7 @@ ON_W8_FILL_05,organic,8,images/organic/w8/fill_05.png,2,fill,pent-______-ene
 ON_W8_FILL_06,organic,8,images/organic/w8/fill_06.png,ethyl,fill,3-______-2-methylheptane
 ON_W8_FILL_07,organic,8,images/organic/w8/fill_07.png,triyne,fill,"octa-1,3,5-______"
 ON_W8_IUPAC_01,organic,8,images/organic/w8/iupac_01.png,"2,3-dimethylbutane",iupac,
-ON_W8_IUPAC_02,organic,8,images/organic/w8/iupac_02.png,cyclohexan-1-one||1-cyclohexanone,iupac,
+ON_W8_IUPAC_02,organic,8,images/organic/w8/iupac_02.png,cyclohexanone||cyclohexan-1-one||1-cyclohexanone,iupac,
 ON_W8_IUPAC_03,organic,8,images/organic/w8/iupac_03.png,oct-1-yne||1-octyne,iupac,
 ,,,,,,
 ON_W9_FILL_01,organic,9,images/organic/w9/fill_01.png,"2,3",fill,4-ethyl-______-dimethylhex-1-ene
