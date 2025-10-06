@@ -199,7 +199,7 @@ function attachTopbar() {
   const back  = document.getElementById("backFromInstr");
 
   if (home) home.onclick = () => bounceAnd(home, resetAndGoHome);
-  if (instr) instr.onclick = () => bounceAnd(instr, resetAndGoHome);
+  if (instr) instr.onclick = () => bounceAnd(instr, () => {goHome(); show("#instructions"); });
   if (back)  back.onclick  = () => bounceAnd(back,  resetAndGoHome);
 }
 
