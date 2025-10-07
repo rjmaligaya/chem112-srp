@@ -151,7 +151,7 @@
       <input id="student" inputmode="numeric" maxlength="8" placeholder="########" autofocus>
       <div class="row">
         <div>
-          <label>Week</label>
+          <label>Week <span id="weekNote" class="muted"></span></label>
           <select id="week">
             <option value="6">Week 6</option>
             <option value="7">Week 7</option>
@@ -163,9 +163,23 @@
           </select>
         </div>
       </div>
+      <p class="muted" id="tzInfo"></p>
       <button id="startBtn" style="margin-top:12px">Begin</button>
       <p class="muted" style="margin-top:8px;">Tip: press <b>Enter</b> to start.</p>
       <p id="landingWarn" class="warn" style="display:none;"></p>
+    </div>
+
+    <!-- Repeat Warning -->
+    <div id="repeatWarn" class="view card hidden">
+      <h2>Heads up 👋</h2>
+      <p class="muted" id="repeatMsg">
+        It looks like you already completed this week. Best practice for spaced retrieval is to wait about 7 days before repeating.
+      </p>
+      <p class="muted" id="nextDue"></p>
+      <div class="actions" style="margin-top:10px;">
+        <button id="doReattemptBtn" class="btn-bad">Do it anyway (save as reattempt)</button>
+        <button id="cancelReattemptBtn">Back</button>
+      </div>
     </div>
 
     <!-- Week Intro -->

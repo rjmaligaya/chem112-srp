@@ -32,14 +32,29 @@ const CONFIG = {
     inorganic: 1 // inorganic gets goal 4 if week=12
   },
   CONFETTI: {
-    PIECES: 100,      // how many pieces
-    SPEED: 1.5,       // velocity multiplier (higher = faster)
-    GRAVITY: 0.06,    // gravity per frame (higher = falls faster)
-    DURATION_FRAMES: 120 // how long the animation runs
+    PIECES: 100,
+    SPEED: 1.5,
+    GRAVITY: 0.06,
+    DURATION_FRAMES: 120
   },
-  // Dev upload fallback: if running on pages.dev, use workers.dev endpoint
-  WORKER_FALLBACK_URL: "https://srp-results-worker.rjmaligaya.workers.dev/api/ingest", // TODO: fill in
+
+  // === NEW: course timezone + week windows ===
+  COURSE_TZ: "America/Toronto",
+  WEEK_SCHEDULE: {
+    // End dates are exclusive
+    6:  { start: "2025-10-06", end: "2025-10-13" },
+    7:  { start: "2025-10-13", end: "2025-10-20" },
+    8:  { start: "2025-10-20", end: "2025-10-27" },
+    9:  { start: "2025-10-27", end: "2025-11-03" },
+    10: { start: "2025-11-03", end: "2025-11-10" },
+    11: { start: "2025-11-10", end: "2025-11-17" },
+    12: { start: "2025-11-17", end: "2025-11-24" }
+  },
+
+  // === CHANGE: make this the BASE url (no /api/ingest here) ===
+  WORKER_FALLBACK_URL: "https://srp-results-worker.rjmaligaya.workers.dev",
 };
+
 
 function nfkc(s) { return s.normalize("NFKC"); }
 function collapseSpaces(s) { return s.replace(/\s+/g, " ").trim(); }
@@ -102,6 +117,10 @@ const State = {
   // meta estimate per topic
   metaEstimate: null,
 };
+
+// Extra state for repeat detection / timezone
+State.userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+State.reattemptMode = false; // toggled true when student chooses "do it anyway"
 
 // Track current "session" and pending cleanups/timers
 State.session = 0;
@@ -323,6 +342,75 @@ function parseCSV(text) {
   });
 }
 
+// ===== Week schedule / timezone helpers =====
+function toZonedDate(d, tz){
+  try {
+    const fmt = new Intl.DateTimeFormat(tz, {
+      year:"numeric", month:"2-digit", day:"2-digit",
+      hour:"2-digit", minute:"2-digit", second:"2-digit"
+    });
+    const parts = fmt.formatToParts(d);
+    const get = (t)=>Number(parts.find(p=>p.type===t).value);
+    // Construct a Date interpreted in local machine time (fine for comparisons)
+    return new Date(get("year"), get("month")-1, get("day"), get("hour"), get("minute"), get("second"));
+  } catch { return d; }
+}
+function parseYMD(ymd, tz){
+  const [y,m,d] = ymd.split("-").map(Number);
+  const local = new Date(y, m-1, d, 0,0,0);
+  return toZonedDate(local, tz);
+}
+function todayInTZ(tz){
+  const now = new Date();
+  const z = toZonedDate(now, tz);
+  return new Date(z.getFullYear(), z.getMonth(), z.getDate(), 0,0,0);
+}
+function weekFromDate(d, schedule, tz){
+  const t = d.getTime();
+  for (const wk of Object.keys(schedule)){
+    const { start, end } = schedule[wk];
+    const s = parseYMD(start, tz).getTime();
+    const e = parseYMD(end, tz).getTime();
+    if (t >= s && t < e) return Number(wk);
+  }
+  return null;
+}
+function lockWeekOptions(){
+  const tz = CONFIG.COURSE_TZ;
+  const today = todayInTZ(tz);
+  const currentWk = weekFromDate(today, CONFIG.WEEK_SCHEDULE, tz);
+  const sel = $("#week");
+  const note = $("#weekNote");
+  const tzInfo = $("#tzInfo");
+  if (tzInfo) tzInfo.textContent = `Detected timezone: ${State.userTimeZone}. Course timezone: ${CONFIG.COURSE_TZ}.`;
+
+  if (!sel) return;
+
+  // Disable future weeks (start > today)
+  Array.from(sel.options).forEach(opt=>{
+    const wk = Number(opt.value);
+    const start = parseYMD(CONFIG.WEEK_SCHEDULE[wk].start, CONFIG.COURSE_TZ);
+    if (start.getTime() > today.getTime()) {
+      opt.disabled = true; 
+      if (!/locked until/.test(opt.textContent)) opt.textContent += " (locked until start)";
+    }
+  });
+
+  // Auto-select current week if open; else last open week
+  if (currentWk && !sel.querySelector(`option[value="${currentWk}"]`)?.disabled) {
+    sel.value = String(currentWk);
+    if (note) note.textContent = `(auto-selected for ${CONFIG.COURSE_TZ})`;
+  } else {
+    let pick = null, maxStart = -Infinity;
+    for (const wk of Object.keys(CONFIG.WEEK_SCHEDULE)){
+      const start = parseYMD(CONFIG.WEEK_SCHEDULE[wk].start, CONFIG.COURSE_TZ).getTime();
+      if (start <= today.getTime() && start > maxStart) { maxStart = start; pick = wk; }
+    }
+    if (pick) { sel.value = String(pick); if (note) note.textContent = `(latest available)`; }
+  }
+}
+
+
 function initLanding() {
   // Click on Begin
   $("#startBtn").addEventListener("click", (e) => {
@@ -346,7 +434,7 @@ function initLanding() {
 }
 
 
-function startSession() {
+async function startSession() {
   runCleanups();     // clear any leftovers just in case
   State.session++;   // new session; invalidate old timers
 
@@ -356,15 +444,57 @@ function startSession() {
   warn.style.display = "none";
   if (!/^[0-9]{8}$/.test(student)) { warn.textContent="Enter an 8-digit student number."; warn.style.display="block"; return; }
   if (!CONFIG.WEEK_TOPICS[week]?.length) { toast("Select a valid week."); return; }
+
   State.studentNumber = student;
   State.week = week;
-  State.topicsQueue = CONFIG.WEEK_TOPICS[week].slice();
+  State.reattemptMode = false;
+
+  // === NEW: preflight status query to worker ===
+  try {
+    const base = location.hostname.endsWith(".pages.dev") ? CONFIG.WORKER_FALLBACK_URL : "";
+    const url = `${base}/api/status?sn=${encodeURIComponent(student)}&week=${encodeURIComponent(week)}`;
+    const res = await fetch(url, { method: "GET", cache:"no-store" });
+    if (res.ok){
+      const data = await res.json();
+      if (data.exists){
+        // Show warning screen with recommended next time
+        const msg = $("#repeatMsg");
+        const nextDue = $("#nextDue");
+        const when = data.completed_at || data.uploaded_at || "";
+        let nextStr = "";
+        if (when){
+          const next = new Date(new Date(when).getTime() + 7*24*60*60*1000);
+          try {
+            const fmt = new Intl.DateTimeFormat(State.userTimeZone, { dateStyle:"full", timeStyle:"short" });
+            nextStr = fmt.format(next);
+          } catch { nextStr = next.toString(); }
+        }
+        if (nextStr) nextDue.textContent = `Recommended next attempt after: ${nextStr}`;
+        else nextDue.textContent = "";
+
+        show("#repeatWarn");
+        $("#doReattemptBtn").onclick = ()=>{ State.reattemptMode = true; proceedAfterPreflight(); };
+        $("#cancelReattemptBtn").onclick = ()=>{ State.reattemptMode = false; goHome(); };
+        return; // stop here, user must choose
+      }
+    }
+  } catch (e) {
+    console.error("status preflight failed", e); // proceed silently
+  }
+
+  proceedAfterPreflight();
+}
+
+
+function proceedAfterPreflight(){
+  State.topicsQueue = CONFIG.WEEK_TOPICS[State.week].slice();
   State.startTime = nowISO();
   State.trials = [];
   State.trialIndex = 0;
   State.attemptNumber = 1;
   showWeekIntro();
 }
+
 
 function showWeekIntro() {
   show("#weekIntro");
@@ -1028,10 +1158,13 @@ async function autoUploadInteractive() {
     completed_at: nowISO(),
     device: State.device,
     trials: State.trials,
+    reattempt: !!State.reattemptMode, // NEW
   };
 
+
   let url = "/api/ingest";
-  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL;
+  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL + "/api/ingest";
+
 
   try {
     const res = await fetch(url, {
@@ -1069,10 +1202,13 @@ async function autoUploadOnce() {
     completed_at: nowISO(),
     device: State.device,
     trials: State.trials,
+    reattempt: !!State.reattemptMode, // NEW
   };
 
+
   let url = "/api/ingest";
-  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL;
+  if (location.hostname.endsWith(".pages.dev")) url = CONFIG.WORKER_FALLBACK_URL + "/api/ingest";
+
 
   try {
     const res = await fetch(url, {
@@ -1098,6 +1234,7 @@ async function autoUploadOnce() {
 window.addEventListener("load", async () => {
   try { await loadCSV(); } catch (e) { console.error(e); toast("CSV failed to load. Ensure items.csv is in the same folder."); }
   attachTopbar();
+  lockWeekOptions(); // NEW: auto-select/lock weeks based on course TZ
   initLanding();
   show("#landing");
 });
