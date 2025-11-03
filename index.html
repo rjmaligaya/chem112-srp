@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CHEM 112 Weekly Flashcards 📚</title>
+  <link rel="preload" href="sounds/correct.mp3" as="audio" type="audio/mpeg">
+  <link rel="preload" href="sounds/incorrect.mp3" as="audio" type="audio/mpeg">
+  <style>
+    :root{
+      --bg:#0b0d10; --fg:#eef2f8; --muted:#9cabba;
+      --card:#0f1318; --border:#1e2630;
+      --btn:#12161c; --btn-border:#3a80ff;
+      --white:#ffffff; --img-border:#d6dde6;
+      --green:#11b66a; --red:#e5484d; --gray:#2a2f36;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+    .container{max-width:820px;margin:0 auto;padding:16px}
+    h1,h2{margin:.4em 0}
+    label{display:block;margin:12px 0 6px;font-size:.95rem;color:#b9c4d0}
+    input,select,button,textarea{
+      width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--gray);
+      background:#12161c;color:var(--fg);font-size:1rem
+    }
+    button{cursor:pointer;border:1px solid var(--btn-border)}
+    button:hover{background:#0d285c}
+    .view.hidden{display:none}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .imgwrap{display:flex;align-items:center;justify-content:center;background:var(--white);border:1px solid var(--img-border);border-radius:16px;height:320px;overflow:hidden}
+    img.q{max-width:100%;max-height:100%}
+    .row{display:flex;gap:12px}
+    .row>*{flex:1}
+    .muted{color:var(--muted);font-size:.9rem}
+    #toast{position:fixed;bottom:18px;left:0;right:0;margin:0 auto;max-width:600px;background:#1b2430;border:1px solid #2b3645;padding:12px 16px;border-radius:12px;text-align:center}
+    #toast.hidden{display:none}
+    .warn{color:#ffcc66;margin-top:8px}
+    .actions{display:flex;gap:10px;align-items:center}
+    .btn-ok{background:#0f1e16;border-color:#0f1e16}
+    .btn-ok.active{background:var(--green);border-color:var(--green)}
+    .btn-bad.active{background:var(--red);border-color:var(--red)}
+    .inline-feedback{margin-top:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:#0b1118}
+    .kpi{display:flex;gap:12px;flex-wrap:wrap}
+    .pill{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#0d1218}
+    .btn-row{display:flex;gap:8px;flex-wrap:wrap}
+    .predict button{flex:1;min-width:46px}
+
+
+    /* --- Topbar --- */
+    .topbar{
+      position:sticky; top:0; z-index:10;
+      display:flex; gap:8px; justify-content:flex-end;
+      padding:8px 16px; background:rgba(11,13,16,.6); backdrop-filter: blur(6px);
+    }
+    .topbar button{ width:auto; padding:10px 14px; }
+
+    /* Keep layout centered and scrollable on mobile/keyboard */
+    html, body { height: 100%; }
+    body { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+
+    .container {
+      max-width: 820px; margin: 0 auto; padding: 16px;
+      min-height: 100dvh;              /* modern viewport unit */
+    }
+    @supports (height: 100svh) {
+      .container { min-height: 100svh; } /* even better on iOS 16+ */
+    }
+
+    /* Optional: avoid pinch zoom “drifting” your centering */
+    .container { display: block; }
+
+    /* --- Mobile sizing helpers --- */
+    .mobile .container{ padding:12px; }
+    .mobile .imgwrap{ height:38vh; }          /* fit image + input on small screens */
+    .mobile input, .mobile select, .mobile button{ font-size:16px; } /* iOS zoom fix */
+
+
+    /* Collapsible instructions */
+    .collapse {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 260ms ease;
+      margin-top: 10px;
+    }
+    .collapse.open {
+      max-height: 70vh; /* a bit more than iframe height for borders/margins */
+    }
+    .instr-check > button { width:auto; }
+
+
+    /* Bigger, centered question prompt */
+    #answerLabel {
+      font-size: 1.22rem;     /* bigger, but smaller than 1.4rem fillPrompt */
+      font-weight: 600;
+      text-align: center;
+      display: block;         /* ensures centering behaves consistently */
+    }
+
+
+    /* Button bounce animation */
+    @keyframes btn-pop { 0%{transform:scale(1)} 40%{transform:scale(0.96)} 100%{transform:scale(1)} }
+    .pop { animation: btn-pop 400ms ease-out; }
+
+    /* --- Button shake on incorrect --- */
+    @keyframes btn-shake {
+      0%,100%{ transform:translateX(0); }
+      15%{ transform:translateX(-6px); }
+      30%{ transform:translateX(6px); }
+      45%{ transform:translateX(-5px); }
+      60%{ transform:translateX(5px); }
+      75%{ transform:translateX(-3px); }
+      90%{ transform:translateX(3px); }
+    }
+    .shake { animation: btn-shake 400ms ease-in-out; }
+
+
+    /* Optional full-screen confetti canvas */
+    #confettiFull { position:fixed; inset:0; pointer-events:none; z-index:9999; }
+  </style>
+</head>
+<body>
+  
+  <div class="topbar">
+    <button id="homeBtn" title="Back to Start">Home</button>
+    <button id="instrBtn" title="Instructions">Instructions</button>
+  </div>
+
+  <!-- Instructions -->
+  <div id="instructions" class="view card hidden">
+    <h2>Instructions</h2>
+    <p class="muted">Read the study instructions below. Use the Back button when you’re ready.</p>
+    <div style="margin:10px 0;">
+      <iframe id="instrFrame" src="instructions.pdf" title="Instructions PDF"
+              style="width:100%;height:70vh;border:1px solid var(--border);border-radius:12px;background:#fff;"></iframe>
+    </div>
+    <div class="actions">
+      <button id="backFromInstr">Back</button>
+    </div>
+  </div>
+
+
+
+  <div class="container">
+    <h1>CHEM 112 Weekly Flashcards 📚</h1>
+    <p class="muted">Answer the questions for your current week. You’ll see feedback after each response and re-attempt missed items until mastery. If you have any questions, please email joshua.maligaya@queensu.ca</p>
+
+    <!-- Start -->
+    <div id="landing" class="view card hidden">
+      <h2>Start</h2>
+      <label>Student Number (8 digits)</label>
+      <input id="student" inputmode="numeric" maxlength="8" placeholder="########" autofocus>
+      <div class="row">
+        <div>
+          <label>Week <span id="weekNote" class="muted"></span></label>
+          <select id="week">
+            <option value="6">Week 6</option>
+            <option value="7">Week 7</option>
+            <option value="8">Week 8</option>
+            <option value="9">Week 9</option>
+            <option value="10">Week 10</option>
+            <option value="11">Week 11</option>
+            <option value="12">Week 12</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted" id="tzInfo"></p>
+      <button id="startBtn" style="margin-top:12px">Begin</button>
+      <p class="muted" style="margin-top:8px;">Tip: press <b>Enter</b> to start.</p>
+      <p id="landingWarn" class="warn" style="display:none;"></p>
+    </div>
+
+    <!-- Repeat Warning -->
+    <div id="repeatWarn" class="view card hidden">
+      <h2>Heads up 👋</h2>
+      <p class="muted" id="repeatMsg">
+        It looks like you already completed this week. Best practice for spaced retrieval is to wait about 7 days before repeating.
+      </p>
+      <p class="muted" id="nextDue"></p>
+      <div class="actions" style="margin-top:10px;">
+        <button id="doReattemptBtn" class="btn-bad">Do it anyway (save as reattempt)</button>
+        <button id="cancelReattemptBtn">Back</button>
+      </div>
+    </div>
+
+    <!-- Week Intro -->
+    <div id="weekIntro" class="view card hidden">
+      <h2>Before You Start</h2>
+      <p class="muted" id="weekIntroSummary"></p>
+      <p class="muted" id="weekIntroMeta"></p>
+
+      <!-- Meta-comprehension picker (shown again per topic) -->
+      <div id="predictWrap" class="predict">
+        <p class="muted" id="predictPrompt"></p>
+        <div id="predictBtns" class="btn-row"></div>
+        <input id="predictInput" type="number" inputmode="numeric" min="0" max="40" placeholder="Enter a number" style="display:none;width:160px;margin-top:8px;">
+        <p id="predictWarn" class="warn" style="display:none;"></p>
+      </div>
+
+      <div class="instr-check" style="margin-top:14px;">
+        <p class="muted" style="margin:0 0 6px;">
+          Have you read the instructions yet? (optional)
+        </p>
+        <button id="toggleInlineInstr" type="button" aria-expanded="false" aria-controls="inlineInstr">
+          Show instructions
+        </button>
+
+      <!-- Collapsible panel -->
+      <div id="inlineInstr" class="collapse" hidden>
+        <iframe
+          src="instructions.pdf"
+          title="Instructions PDF"
+          style="width:100%;height:60vh;border:1px solid var(--border);border-radius:12px;background:#fff;"
+        ></iframe>
+      </div>
+    </div>
+
+
+      <div class="actions" style="margin-top:10px;">
+        <button id="beginWeekBtn" disabled>Continue</button>
+        <span class="muted">Press <b>Enter</b> to continue.</span>
+      </div>
+    </div>
+
+    <!-- Topic Intro -->
+    <div id="topicIntro" class="view card hidden">
+      <h2 id="topicTitle"></h2>
+      <p id="topicDesc" class="muted"></p>
+      <div class="actions">
+        <button id="beginTopicBtn" disabled>Start Topic</button>
+        <span class="muted">Press <b>Enter</b> to start.</span>
+      </div>
+    </div>
+
+    <!-- Trial -->
+    <div id="trial" class="view card hidden">
+      <div class="imgwrap"><canvas id="confetti" width="800" height="320" style="position:absolute;pointer-events:none"></canvas><img id="qImage" class="q" alt="Question image"></div>
+      <h2 id="fillPrompt" style="text-align:center;font-size:1.4rem;margin:14px 0;display:none;"></h2>
+      <label id="answerLabel" style="margin-top:12px;">Your answer</label>
+      <input id="answer" placeholder="Type your answer" data-autofocus>
+      <div class="actions">
+        <button id="submitBtn" style="margin-top:12px">Submit</button>
+        <span id="countdown" class="muted"></span>
+      </div>
+      <p id="trialWarn" class="warn" style="display:none;">Please enter an answer</p>
+
+      <div id="inlineFeedback" class="inline-feedback" style="display:none;">
+        <div class="kpi">
+          <span class="pill">Your answer: <b id="fbYour"></b></span>
+          <span class="pill">Correct answer: <b id="fbCorrect"></b></span>
+        </div>
+        <div id="altAnswers" class="muted" style="margin-top:6px;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Attempt Summary -->
+    <div id="fpSummary" class="view card hidden">
+      <h2 id="attemptTitle">Attempt 1 summary</h2>
+      <p id="attemptNext" class="muted"></p>
+      <div class="actions">
+        <button id="beginMasteryBtn">Continue</button>
+        <span class="muted">Press <b>Enter</b> to continue.</span>
+      </div>
+    </div>
+
+    <!-- Session Summary -->
+    <div id="summary" class="view card hidden">
+      <h2>Flashcards complete! 🎉</h2>
+      <p class="muted">Thank you for your participation!</p>
+      <div class="actions">
+        <button id="submitResultsBtn">Check/Retry Upload</button>
+        <span id="uploadStatus" class="muted" style="margin-left:8px;"></span>
+      </div>
+    </div>
+
+    <!-- Thank you -->
+    <div id="thankyou" class="view card hidden">
+      <h2>Thank you!</h2>
+      <p class="muted">Your results have been received.</p>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <audio id="sndOk" src="sounds/correct.mp3" preload="auto"></audio>
+  <audio id="sndBad" src="sounds/incorrect.mp3" preload="auto"></audio>
+
+  <script src="app.js"></script>
+</body>
+</html>
