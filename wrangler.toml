@@ -1,7 +1,0 @@
-name = "srp-results-worker"
-main = "worker.mjs"
-compatibility_date = "2024-12-01"
-
-[[r2_buckets]]
-binding = "RESULTS"           # accessible as env.RESULTS
-bucket_name = "srp-results"   # create this bucket in Cloudflare R2
